@@ -2,37 +2,28 @@ import "./tool-utils.js";
 
 const utils = globalThis.WrenchUtils;
 const $ = (id) => document.getElementById(id);
+const categoryOrder = ["数据处理", "编码转换", "证书工具"];
 
 const tools = [
   {
-    id: "json-format",
-    name: "JSON 格式化",
+    id: "json",
+    name: "JSON",
     category: "数据处理",
-    desc: "从日志或混杂文本中提取 JSON 并格式化",
+    desc: "提取、格式化、压缩和表格查看 JSON",
     placeholder: "2026-07-06 INFO {\"ok\":true,\"items\":[1,2]}",
+    options: [
+      { id: "jsonMode", label: "处理方式", type: "select", value: "format", choices: [["format", "格式化"], ["minify", "压缩"], ["table", "表格视图"]] }
+    ],
     async transform(input) {
+      const mode = optionValue("jsonMode");
+      if (mode === "minify") {
+        return { output: utils.minifyJSONText(input) };
+      }
+      if (mode === "table") {
+        const value = JSON.parse(utils.extractJSONText(input));
+        return { output: jsonToRows(value).map((row) => `${row.path}\t${row.value}`).join("\n") };
+      }
       return { output: utils.formatJSONText(input, 2) };
-    }
-  },
-  {
-    id: "json-minify",
-    name: "JSON 压缩",
-    category: "数据处理",
-    desc: "提取 JSON 并压缩为单行",
-    placeholder: "{\n  \"ok\": true\n}",
-    async transform(input) {
-      return { output: utils.minifyJSONText(input) };
-    }
-  },
-  {
-    id: "json-table",
-    name: "JSON 表格视图",
-    category: "数据处理",
-    desc: "把对象或数组展开为路径和值",
-    placeholder: "{\"user\":{\"name\":\"Alice\"},\"roles\":[\"admin\"]}",
-    async transform(input) {
-      const value = JSON.parse(utils.extractJSONText(input));
-      return { output: jsonToRows(value).map((row) => `${row.path}\t${row.value}`).join("\n") };
     }
   },
   {
@@ -55,43 +46,35 @@ const tools = [
     }
   },
   {
-    id: "base64-encode",
-    name: "Base64 编码",
+    id: "base64",
+    name: "Base64",
     category: "编码转换",
-    desc: "UTF-8 文本编码为 Base64",
+    desc: "UTF-8 文本 Base64 编码和解码",
     placeholder: "中文 test",
+    options: [
+      { id: "base64Mode", label: "处理方式", type: "select", value: "encode", choices: [["encode", "编码"], ["decode", "解码"]] }
+    ],
     async transform(input) {
+      if (optionValue("base64Mode") === "decode") {
+        return { output: utils.base64ToUtf8(input) };
+      }
       return { output: utils.utf8ToBase64(input) };
     }
   },
   {
-    id: "base64-decode",
-    name: "Base64 解码",
+    id: "url",
+    name: "URL",
     category: "编码转换",
-    desc: "Base64 解码为 UTF-8 文本，兼容 URL-safe Base64",
-    placeholder: "5Lit5paHIHRlc3Q=",
-    async transform(input) {
-      return { output: utils.base64ToUtf8(input) };
-    }
-  },
-  {
-    id: "url-encode",
-    name: "URL 编码",
-    category: "编码转换",
-    desc: "URL percent-encoding 编码",
+    desc: "URL percent-encoding 编码和解码",
     placeholder: "name=张三&x=1 2",
+    options: [
+      { id: "urlMode", label: "处理方式", type: "select", value: "encode", choices: [["encode", "编码"], ["decode", "解码"]] }
+    ],
     async transform(input) {
+      if (optionValue("urlMode") === "decode") {
+        return { output: utils.decodeURLText(input) };
+      }
       return { output: utils.encodeURLText(input) };
-    }
-  },
-  {
-    id: "url-decode",
-    name: "URL 解码",
-    category: "编码转换",
-    desc: "URL percent-encoding 解码，+ 会按空格处理",
-    placeholder: "name%3D%E5%BC%A0%E4%B8%89%26x%3D1+2",
-    async transform(input) {
-      return { output: utils.decodeURLText(input) };
     }
   },
   {
@@ -144,6 +127,7 @@ const tools = [
 
 let activeTool = tools[0];
 let historyItems = [];
+let historyScope = "current";
 
 const localHistory = {
   async Create(req) {
@@ -191,15 +175,33 @@ async function loadHistoryService() {
 const historyService = await loadHistoryService();
 
 function renderTools() {
-  $("toolNav").innerHTML = "";
-  tools.forEach((tool) => {
-    const button = document.createElement("button");
-    button.className = "tool-button";
-    button.classList.toggle("active", tool.id === activeTool.id);
-    button.innerHTML = `<strong>${tool.name}</strong><span>${tool.category}</span><small>${tool.desc}</small>`;
-    button.addEventListener("click", () => selectTool(tool.id));
-    $("toolNav").appendChild(button);
-  });
+  const nav = $("toolNav");
+  const query = $("toolSearch").value.trim().toLowerCase();
+  nav.innerHTML = "";
+
+  const filtered = tools.filter((tool) => matchesTool(tool, query));
+  if (filtered.length === 0) {
+    nav.innerHTML = `<div class="empty compact">没有匹配的工具</div>`;
+    return;
+  }
+
+  categoryOrder
+    .filter((category) => filtered.some((tool) => tool.category === category))
+    .forEach((category) => {
+      const group = document.createElement("section");
+      group.className = "tool-group";
+      const categoryTools = filtered.filter((tool) => tool.category === category);
+      group.innerHTML = `<div class="tool-category"><span>${category}</span><small>${categoryTools.length}</small></div>`;
+      categoryTools.forEach((tool) => {
+        const button = document.createElement("button");
+        button.className = "tool-button";
+        button.classList.toggle("active", tool.id === activeTool.id);
+        button.innerHTML = `<strong>${tool.name}</strong><span>${tool.category}</span><small>${tool.desc}</small>`;
+        button.addEventListener("click", () => selectTool(tool.id));
+        group.appendChild(button);
+      });
+      nav.appendChild(group);
+    });
 }
 
 function renderOptions() {
@@ -222,7 +224,7 @@ function renderOptions() {
   });
 }
 
-async function selectTool(id) {
+async function selectTool(id, options = {}) {
   activeTool = tools.find((tool) => tool.id === id) || tools[0];
   $("toolName").textContent = activeTool.name;
   $("toolCategory").textContent = activeTool.category;
@@ -233,7 +235,9 @@ async function selectTool(id) {
   renderDetails();
   renderTools();
   renderOptions();
-  await refreshHistory();
+  if (!options.keepHistory) {
+    await refreshHistory();
+  }
 }
 
 async function runTransform() {
@@ -262,7 +266,9 @@ async function runTransform() {
 }
 
 async function refreshHistory() {
-  historyItems = await historyService.List(activeTool.id, 100) || [];
+  const tool = historyScope === "current" ? activeTool.id : "";
+  historyItems = await historyService.List(tool, 100) || [];
+  renderHistoryScope();
   renderHistory();
 }
 
@@ -271,7 +277,7 @@ function renderHistory() {
   const list = $("historyList");
   list.innerHTML = "";
 
-  const filtered = historyItems.filter((item) => `${item.title} ${item.input} ${item.output}`.toLowerCase().includes(query));
+  const filtered = historyItems.filter((item) => `${historyTitle(item)} ${item.input} ${item.output}`.toLowerCase().includes(query));
   if (filtered.length === 0) {
     list.innerHTML = `<div class="empty">暂无历史</div>`;
     return;
@@ -282,13 +288,16 @@ function renderHistory() {
     row.className = "history-item";
     row.innerHTML = `
       <button class="history-load">
-        <strong>${escapeHtml(item.title || item.tool)}</strong>
+        <strong>${escapeHtml(historyTitle(item))}</strong>
         <span>${formatTime(item.createdAt)}</span>
         <small>${escapeHtml(item.input || item.output)}</small>
       </button>
       <button class="history-delete">删除</button>
     `;
-    row.querySelector(".history-load").addEventListener("click", () => {
+    row.querySelector(".history-load").addEventListener("click", async () => {
+      if (item.tool && item.tool !== activeTool.id) {
+        await selectTool(item.tool, { keepHistory: true });
+      }
       $("inputText").value = item.input || "";
       $("outputText").value = item.output || "";
       renderDetails();
@@ -300,6 +309,11 @@ function renderHistory() {
     });
     list.appendChild(row);
   });
+}
+
+function renderHistoryScope() {
+  $("historyCurrent").classList.toggle("active", historyScope === "current");
+  $("historyAll").classList.toggle("active", historyScope === "all");
 }
 
 function renderDetails(details = []) {
@@ -330,6 +344,19 @@ function jsonToRows(value, prefix = "$") {
 function optionValue(id) {
   const el = $(id);
   return el ? el.value : "";
+}
+
+function matchesTool(tool, query) {
+  if (!query) return true;
+  return [tool.name, tool.category, tool.desc, tool.id].join(" ").toLowerCase().includes(query);
+}
+
+function historyTitle(item) {
+  const tool = tools.find((candidate) => candidate.id === item.tool);
+  if (historyScope === "all" && tool) {
+    return `${tool.name} · ${item.title || summarize(item.input) || item.tool}`;
+  }
+  return item.title || item.tool;
 }
 
 function setStatus(text, isError) {
@@ -381,10 +408,19 @@ $("clearInput").addEventListener("click", () => {
   setStatus("", false);
 });
 $("clearHistory").addEventListener("click", async () => {
-  await historyService.Clear(activeTool.id);
+  await historyService.Clear(historyScope === "current" ? activeTool.id : "");
   await refreshHistory();
 });
 $("historySearch").addEventListener("input", renderHistory);
+$("toolSearch").addEventListener("input", renderTools);
+$("historyCurrent").addEventListener("click", async () => {
+  historyScope = "current";
+  await refreshHistory();
+});
+$("historyAll").addEventListener("click", async () => {
+  historyScope = "all";
+  await refreshHistory();
+});
 
 $("historyPath").textContent = await historyService.DataPath();
 await selectTool(activeTool.id);
