@@ -4,9 +4,11 @@ test:
 	go test ./internal/...
 
 frontend-build:
+	rm -rf frontend/dist
 	mkdir -p frontend/dist
 	cp frontend/index.html frontend/dist/index.html
 	cp -R frontend/src frontend/dist/src
+	rm -f frontend/dist/src/*.test.js
 	cp -R frontend/public frontend/dist/public
 	if [ -d frontend/bindings ]; then cp -R frontend/bindings frontend/dist/bindings; fi
 
