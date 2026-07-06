@@ -137,6 +137,22 @@
         </div>
       </div>
     </main>
+
+    <aside class="history-panel">
+      <div class="history-head">
+        <div>
+          <strong>历史记录</strong>
+          <span id="historyPath"></span>
+        </div>
+        <button id="clearHistory" class="btn danger" type="button">清空</button>
+      </div>
+      <div class="history-scope" role="group" aria-label="历史范围">
+        <button id="historyCurrent" class="scope-button active" type="button">当前工具</button>
+        <button id="historyAll" class="scope-button" type="button">全部历史</button>
+      </div>
+      <input id="historySearch" class="history-search" type="search" placeholder="搜索历史" autocomplete="off">
+      <div id="historyList" class="history-list"></div>
+    </aside>
   </div>
 
   <script type="module" src="./src/main.js"></script>

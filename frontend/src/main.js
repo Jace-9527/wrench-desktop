@@ -139,6 +139,53 @@ let activeTool = toolCatalog[0];
 let activeAction = activeTool.actions[0].id;
 let jsonTableRows = [];
 const collapsedSidebarCategories = new Set();
+let historyItems = [];
+let historyScope = "current";
+
+const localHistory = {
+  async Create(req) {
+    const entry = {
+      id: String(Date.now()),
+      createdAt: new Date().toISOString(),
+      title: req.title || summarizeText(req.input) || req.tool,
+      ...req
+    };
+    const items = JSON.parse(localStorage.getItem("wrench-desktop-history") || "[]");
+    items.push(entry);
+    localStorage.setItem("wrench-desktop-history", JSON.stringify(items));
+    return entry;
+  },
+  async List(tool, limit) {
+    const items = JSON.parse(localStorage.getItem("wrench-desktop-history") || "[]");
+    return items.filter((item) => !tool || item.tool === tool).slice().reverse().slice(0, limit || 100);
+  },
+  async Delete(id) {
+    const items = JSON.parse(localStorage.getItem("wrench-desktop-history") || "[]");
+    localStorage.setItem("wrench-desktop-history", JSON.stringify(items.filter((item) => item.id !== id)));
+  },
+  async Clear(tool) {
+    if (!tool) {
+      localStorage.removeItem("wrench-desktop-history");
+      return;
+    }
+    const items = JSON.parse(localStorage.getItem("wrench-desktop-history") || "[]");
+    localStorage.setItem("wrench-desktop-history", JSON.stringify(items.filter((item) => item.tool !== tool)));
+  },
+  async DataPath() {
+    return "浏览器预览模式：localStorage";
+  }
+};
+
+async function loadHistoryService() {
+  try {
+    const bindings = await import("../bindings/wrench-desktop/index.js");
+    return bindings.HistoryService || localHistory;
+  } catch {
+    return localHistory;
+  }
+}
+
+const historyService = await loadHistoryService();
 
 function matchesTool(tool, query) {
   if (!query) return true;
@@ -249,6 +296,7 @@ function showHome() {
   $("toolView").hidden = true;
   renderSidebarTools();
   renderHomeTools();
+  refreshHistory();
 }
 
 function selectTool(id) {
@@ -266,6 +314,7 @@ function selectTool(id) {
   if (isJSONTool) {
     resetJSONWorkspace();
     renderSidebarTools();
+    refreshHistory();
     return;
   }
 
@@ -277,6 +326,7 @@ function selectTool(id) {
   renderActions();
   renderOptions();
   renderSidebarTools();
+  refreshHistory();
 }
 
 function renderActions() {
@@ -335,7 +385,8 @@ async function runTool(action) {
     const result = await activeTool.run(action || activeAction, input);
     $("outputText").value = result.output;
     renderDetails(result.details);
-    setStatus("已完成", false);
+    await saveHistoryEntry(activeTool, input, result.output, action || activeAction);
+    setStatus("已完成并保存历史", false);
   } catch (error) {
     setStatus(error instanceof Error ? error.message : String(error), true);
   }
@@ -363,7 +414,7 @@ function resetJSONWorkspace() {
   clearJSONTableView();
 }
 
-function formatJSON() {
+async function formatJSON() {
   const input = $("jsonInput").value.trim();
   if (!input) {
     setJSONStatus("输入为空", true);
@@ -372,7 +423,8 @@ function formatJSON() {
   try {
     const formatted = utils.formatJSONText(input, 2);
     setJSONOutput(formatted, true);
-    setJSONStatus("格式化完成", false);
+    await saveHistoryEntry(activeTool, input, formatted, "format");
+    setJSONStatus("格式化完成并保存历史", false);
   } catch (error) {
     setJSONOutput("", false);
     clearJSONTableView();
@@ -380,7 +432,7 @@ function formatJSON() {
   }
 }
 
-function minifyJSON() {
+async function minifyJSON() {
   const input = $("jsonInput").value.trim();
   if (!input) {
     setJSONStatus("输入为空", true);
@@ -389,7 +441,8 @@ function minifyJSON() {
   try {
     const minified = utils.minifyJSONText(input);
     setJSONOutput(minified, false);
-    setJSONStatus("压缩完成", false);
+    await saveHistoryEntry(activeTool, input, minified, "minify");
+    setJSONStatus("压缩完成并保存历史", false);
   } catch (error) {
     setJSONOutput("", false);
     clearJSONTableView();
@@ -652,6 +705,102 @@ function formatDate(value) {
   return date.toLocaleString();
 }
 
+async function saveHistoryEntry(tool, input, output, action) {
+  if (!input && !output) return;
+  const actionLabel = tool.actions?.find((item) => item.id === action)?.label;
+  await historyService.Create({
+    tool: tool.id,
+    title: actionLabel ? `${tool.name} · ${actionLabel}` : tool.name,
+    input,
+    output
+  });
+  await refreshHistory();
+}
+
+async function refreshHistory() {
+  const tool = historyScope === "current" && !$("toolView").hidden ? activeTool.id : "";
+  try {
+    historyItems = await historyService.List(tool, 100) || [];
+    $("historyPath").textContent = await historyService.DataPath();
+    renderHistoryScope();
+    renderHistory();
+  } catch (error) {
+    $("historyList").innerHTML = `<div class="empty-state">历史读取失败：${escapeHtml(error instanceof Error ? error.message : String(error))}</div>`;
+  }
+}
+
+function renderHistoryScope() {
+  $("historyCurrent").classList.toggle("active", historyScope === "current");
+  $("historyAll").classList.toggle("active", historyScope === "all");
+}
+
+function renderHistory() {
+  const query = $("historySearch").value.trim().toLowerCase();
+  const list = $("historyList");
+  const filtered = historyItems.filter((item) => `${item.title || ""} ${item.input || ""} ${item.output || ""}`.toLowerCase().includes(query));
+  list.innerHTML = "";
+
+  if (!filtered.length) {
+    list.innerHTML = `<div class="empty-state compact">暂无历史</div>`;
+    return;
+  }
+
+  filtered.forEach((item) => {
+    const row = document.createElement("article");
+    row.className = "history-item";
+    row.innerHTML = `
+      <button class="history-load" type="button">
+        <strong>${escapeHtml(historyTitle(item))}</strong>
+        <span>${escapeHtml(toolNameByID(item.tool))} · ${escapeHtml(formatTime(item.createdAt))}</span>
+        <small>${escapeHtml(summarizeText(item.input || item.output))}</small>
+      </button>
+      <button class="history-delete" type="button">删除</button>
+    `;
+    row.querySelector(".history-load").addEventListener("click", () => loadHistoryEntry(item));
+    row.querySelector(".history-delete").addEventListener("click", async () => {
+      await historyService.Delete(item.id);
+      await refreshHistory();
+    });
+    list.appendChild(row);
+  });
+}
+
+function loadHistoryEntry(item) {
+  selectTool(item.tool);
+  const isJSONTool = item.tool === "json";
+  if (isJSONTool) {
+    $("jsonInput").value = item.input || "";
+    setJSONOutput(item.output || "", Boolean(item.output));
+    setJSONStatus("已载入历史", false);
+    return;
+  }
+  $("inputText").value = item.input || "";
+  $("outputText").value = item.output || "";
+  renderDetails();
+  setStatus("已载入历史", false);
+}
+
+function historyTitle(item) {
+  return item.title || toolNameByID(item.tool) || "历史记录";
+}
+
+function toolNameByID(id) {
+  return toolCatalog.find((tool) => tool.id === id)?.name || id || "未知工具";
+}
+
+function summarizeText(text) {
+  const value = String(text || "").replace(/\s+/g, " ").trim();
+  if (value.length <= 64) return value;
+  return `${value.slice(0, 64)}...`;
+}
+
+function formatTime(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value);
+  return date.toLocaleString();
+}
+
 function escapeHtml(text) {
   return String(text).replace(/[&<>"']/g, (char) => ({
     "&": "&amp;",
@@ -712,6 +861,21 @@ $("homeToolSearchClear").addEventListener("click", () => {
   $("homeToolSearch").value = "";
   renderHomeTools();
 });
+$("historyCurrent").addEventListener("click", () => {
+  historyScope = "current";
+  refreshHistory();
+});
+$("historyAll").addEventListener("click", () => {
+  historyScope = "all";
+  refreshHistory();
+});
+$("historySearch").addEventListener("input", renderHistory);
+$("clearHistory").addEventListener("click", async () => {
+  const tool = historyScope === "current" && !$("toolView").hidden ? activeTool.id : "";
+  await historyService.Clear(tool);
+  await refreshHistory();
+});
 
 renderSidebarTools();
 renderHomeTools();
+refreshHistory();

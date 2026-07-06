@@ -36,7 +36,7 @@ button { cursor: pointer; }
 .app-shell {
   min-height: 100vh;
   display: grid;
-  grid-template-columns: 300px minmax(0, 1fr);
+  grid-template-columns: 300px minmax(0, 1fr) 340px;
 }
 
 .app-sidebar {
@@ -245,7 +245,160 @@ textarea:focus {
   color: var(--text);
 }
 
+.btn.danger {
+  border-color: rgba(248, 113, 113, 0.28);
+  background: rgba(248, 113, 113, 0.08);
+  color: var(--danger);
+}
+
 .btn:hover { filter: brightness(1.08); }
+
+.history-panel {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  min-width: 0;
+  overflow-y: auto;
+  border-left: 1px solid var(--border);
+  background: rgba(7, 11, 20, 0.78);
+  padding: 18px;
+}
+
+.history-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.history-head strong,
+.history-head span {
+  display: block;
+}
+
+.history-head strong {
+  color: var(--text);
+  font-size: 15px;
+}
+
+.history-head span {
+  max-width: 220px;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.history-scope {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.72);
+  padding: 4px;
+  margin-bottom: 12px;
+}
+
+.scope-button {
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  padding: 7px 8px;
+}
+
+.scope-button.active,
+.scope-button:hover {
+  border-color: rgba(96, 165, 250, 0.24);
+  background: rgba(96, 165, 250, 0.12);
+  color: var(--text);
+  filter: none;
+}
+
+.history-search {
+  width: 100%;
+  margin-bottom: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.9);
+  color: var(--text);
+  padding: 9px 10px;
+  outline: none;
+}
+
+.history-search::placeholder {
+  color: rgba(156, 163, 175, 0.72);
+}
+
+.history-search:focus {
+  border-color: rgba(96, 165, 250, 0.45);
+  box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.12);
+}
+
+.history-list {
+  display: grid;
+  gap: 10px;
+}
+
+.history-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: stretch;
+  gap: 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: rgba(18, 27, 46, 0.58);
+  padding: 8px;
+}
+
+.history-item:hover {
+  border-color: rgba(96, 165, 250, 0.22);
+  background: rgba(18, 27, 46, 0.82);
+}
+
+.history-load {
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  padding: 0;
+  text-align: left;
+}
+
+.history-load:hover {
+  filter: none;
+}
+
+.history-load strong,
+.history-load span,
+.history-load small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.history-load strong {
+  font-size: 13px;
+}
+
+.history-load span,
+.history-load small {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.history-delete {
+  border: 1px solid rgba(248, 113, 113, 0.2);
+  border-radius: 6px;
+  background: rgba(248, 113, 113, 0.08);
+  color: var(--danger);
+  padding: 6px 8px;
+}
 
 .home-hero,
 .tool-header,
@@ -795,6 +948,13 @@ textarea {
     height: auto;
     border-right: 0;
     border-bottom: 1px solid var(--border);
+  }
+
+  .history-panel {
+    position: static;
+    height: auto;
+    border-left: 0;
+    border-top: 1px solid var(--border);
   }
   .editor-grid,
   .generic-grid,
