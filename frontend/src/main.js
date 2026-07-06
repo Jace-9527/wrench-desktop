@@ -2,41 +2,79 @@ import "./tool-utils.js";
 
 const utils = globalThis.WrenchUtils;
 const $ = (id) => document.getElementById(id);
-const categoryOrder = ["数据处理", "编码转换", "证书工具"];
 
-const tools = [
+const categoryOrder = ["数据处理", "编码转换", "证书工具"];
+const homeCategoryOrder = ["数据处理", "证书工具", "编码转换"];
+const toolCatalog = [
   {
     id: "json",
-    name: "JSON",
+    name: "JSON 解析器",
     category: "数据处理",
-    desc: "提取、格式化、压缩和表格查看 JSON",
-    placeholder: "2026-07-06 INFO {\"ok\":true,\"items\":[1,2]}",
-    options: [
-      { id: "jsonMode", label: "处理方式", type: "select", value: "format", choices: [["format", "格式化"], ["minify", "压缩"], ["table", "表格视图"]] }
+    desc: "提取、格式化、压缩和表格查看 JSON 数据",
+    tags: ["json", "format", "minify", "格式化", "压缩", "校验", "解析", "表格"],
+    placeholder: "2026-07-06 INFO {\"ok\":true,\"items\":[1,2]} trailing",
+    actions: [
+      { id: "format", label: "格式化", primary: true },
+      { id: "minify", label: "压缩" },
+      { id: "table", label: "表格视图" }
     ],
-    async transform(input) {
-      const mode = optionValue("jsonMode");
-      if (mode === "minify") {
-        return { output: utils.minifyJSONText(input) };
-      }
-      if (mode === "table") {
+    async run(action, input) {
+      if (action === "minify") return { output: utils.minifyJSONText(input) };
+      if (action === "table") {
         const value = JSON.parse(utils.extractJSONText(input));
-        return { output: jsonToRows(value).map((row) => `${row.path}\t${row.value}`).join("\n") };
+        return {
+          output: jsonToRows(value).map((row) => `${row.path}\t${row.value}`).join("\n"),
+          details: [["视图", "路径和值"], ["行数", String(jsonToRows(value).length)]]
+        };
       }
       return { output: utils.formatJSONText(input, 2) };
+    }
+  },
+  {
+    id: "base64",
+    name: "Base64 编解码",
+    category: "编码转换",
+    desc: "UTF-8 文本 Base64 编码和解码",
+    tags: ["base64", "b64", "编码", "解码"],
+    placeholder: "中文 test",
+    actions: [
+      { id: "encode", label: "编码", primary: true },
+      { id: "decode", label: "解码" }
+    ],
+    async run(action, input) {
+      if (action === "decode") return { output: utils.base64ToUtf8(input) };
+      return { output: utils.utf8ToBase64(input) };
+    }
+  },
+  {
+    id: "url",
+    name: "URL 编解码",
+    category: "编码转换",
+    desc: "URL 参数和文本片段 percent-encoding 编解码",
+    tags: ["url", "uri", "encode", "decode", "编码", "解码"],
+    placeholder: "name=张三&x=1 2",
+    actions: [
+      { id: "encode", label: "编码", primary: true },
+      { id: "decode", label: "解码" }
+    ],
+    async run(action, input) {
+      if (action === "decode") return { output: utils.decodeURLText(input) };
+      return { output: utils.encodeURLText(input) };
     }
   },
   {
     id: "pg-array",
     name: "PG Array 转换",
     category: "数据处理",
-    desc: "把换行、逗号或空格分隔的 ID 转为 SQL IN 片段",
+    desc: "把一串 ID 转成 PostgreSQL IN 查询数组",
+    tags: ["postgres", "pg", "sql", "array", "in", "id", "数组"],
     placeholder: "1001\n1002,1003",
+    actions: [{ id: "convert", label: "转换", primary: true }],
     options: [
       { id: "pgMode", label: "输出模式", type: "select", value: "auto", choices: [["auto", "自动"], ["number", "数字"], ["string", "字符串"]] },
       { id: "pgUnique", label: "去重", type: "checkbox", checked: true }
     ],
-    async transform(input) {
+    async run(action, input) {
       return {
         output: utils.toPGArray(input, {
           mode: optionValue("pgMode"),
@@ -46,44 +84,14 @@ const tools = [
     }
   },
   {
-    id: "base64",
-    name: "Base64",
-    category: "编码转换",
-    desc: "UTF-8 文本 Base64 编码和解码",
-    placeholder: "中文 test",
-    options: [
-      { id: "base64Mode", label: "处理方式", type: "select", value: "encode", choices: [["encode", "编码"], ["decode", "解码"]] }
-    ],
-    async transform(input) {
-      if (optionValue("base64Mode") === "decode") {
-        return { output: utils.base64ToUtf8(input) };
-      }
-      return { output: utils.utf8ToBase64(input) };
-    }
-  },
-  {
-    id: "url",
-    name: "URL",
-    category: "编码转换",
-    desc: "URL percent-encoding 编码和解码",
-    placeholder: "name=张三&x=1 2",
-    options: [
-      { id: "urlMode", label: "处理方式", type: "select", value: "encode", choices: [["encode", "编码"], ["decode", "解码"]] }
-    ],
-    async transform(input) {
-      if (optionValue("urlMode") === "decode") {
-        return { output: utils.decodeURLText(input) };
-      }
-      return { output: utils.encodeURLText(input) };
-    }
-  },
-  {
     id: "csr",
-    name: "CSR 格式化/解析",
+    name: "CSR 格式化",
     category: "证书工具",
-    desc: "规范化 CSR PEM，并解析 Subject、SAN 和算法",
+    desc: "输入 JSON 或原始 CSR，输出规范化 PEM",
+    tags: ["csr", "pem", "证书请求", "格式化"],
     placeholder: "-----BEGIN CERTIFICATE REQUEST-----\\n...\\n-----END CERTIFICATE REQUEST-----",
-    async transform(input) {
+    actions: [{ id: "parse", label: "格式化/解析", primary: true }],
+    async run(action, input) {
       const csr = utils.parseCSRPEM(input);
       return {
         output: csr.pem,
@@ -102,11 +110,13 @@ const tools = [
   },
   {
     id: "cert",
-    name: "证书链格式化/解析",
+    name: "证书格式化",
     category: "证书工具",
-    desc: "拆分证书链、规范化 PEM，并解析 X.509 基础字段",
+    desc: "拆分证书链并查看证书信息",
+    tags: ["cert", "certificate", "pem", "证书链", "x509"],
     placeholder: "-----BEGIN CERTIFICATE-----\\n...\\n-----END CERTIFICATE-----",
-    async transform(input) {
+    actions: [{ id: "parse", label: "格式化/解析", primary: true }],
+    async run(action, input) {
       const certs = await Promise.all(utils.splitCertificatePEMs(input).map((pem) => utils.parseCertificatePEM(pem)));
       return {
         output: certs.map((cert) => cert.pem).join("\n"),
@@ -125,83 +135,173 @@ const tools = [
   }
 ];
 
-let activeTool = tools[0];
-let historyItems = [];
-let historyScope = "current";
+let activeTool = toolCatalog[0];
+let activeAction = activeTool.actions[0].id;
+let jsonTableRows = [];
+const collapsedSidebarCategories = new Set();
 
-const localHistory = {
-  async Create(req) {
-    const entry = {
-      id: String(Date.now()),
-      createdAt: new Date().toISOString(),
-      title: req.title || summarize(req.input) || req.tool,
-      ...req
-    };
-    const items = JSON.parse(localStorage.getItem("wrench-desktop-history") || "[]");
-    items.push(entry);
-    localStorage.setItem("wrench-desktop-history", JSON.stringify(items));
-    return entry;
-  },
-  async List(tool, limit) {
-    const items = JSON.parse(localStorage.getItem("wrench-desktop-history") || "[]");
-    return items.filter((item) => !tool || item.tool === tool).slice().reverse().slice(0, limit || 100);
-  },
-  async Delete(id) {
-    const items = JSON.parse(localStorage.getItem("wrench-desktop-history") || "[]");
-    localStorage.setItem("wrench-desktop-history", JSON.stringify(items.filter((item) => item.id !== id)));
-  },
-  async Clear(tool) {
-    if (!tool) {
-      localStorage.removeItem("wrench-desktop-history");
-      return;
-    }
-    const items = JSON.parse(localStorage.getItem("wrench-desktop-history") || "[]");
-    localStorage.setItem("wrench-desktop-history", JSON.stringify(items.filter((item) => item.tool !== tool)));
-  },
-  async DataPath() {
-    return "浏览器预览模式：localStorage";
-  }
-};
-
-async function loadHistoryService() {
-  try {
-    const bindings = await import("../bindings/wrench-desktop/index.js");
-    return bindings.HistoryService || localHistory;
-  } catch {
-    return localHistory;
-  }
+function matchesTool(tool, query) {
+  if (!query) return true;
+  return [tool.name, tool.category, tool.desc, ...(tool.tags || [])].join(" ").toLowerCase().includes(query.toLowerCase());
 }
 
-const historyService = await loadHistoryService();
+function toolsForCategory(category) {
+  if (category === "全部") return toolCatalog;
+  return toolCatalog.filter((tool) => tool.category === category);
+}
 
-function renderTools() {
-  const nav = $("toolNav");
-  const query = $("toolSearch").value.trim().toLowerCase();
+function renderSidebarTools() {
+  const query = $("toolSearch").value.trim();
+  const nav = $("sidebarTools");
   nav.innerHTML = "";
 
-  const filtered = tools.filter((tool) => matchesTool(tool, query));
-  if (filtered.length === 0) {
-    nav.innerHTML = `<div class="empty compact">没有匹配的工具</div>`;
+  const home = document.createElement("button");
+  home.className = "app-sidebar-home";
+  home.type = "button";
+  home.classList.toggle("active", $("toolView").hidden);
+  home.innerHTML = `<span>首页</span><small>全部工具概览</small>`;
+  home.addEventListener("click", showHome);
+  nav.appendChild(home);
+
+  categoryOrder.forEach((category) => {
+    const tools = toolsForCategory(category).filter((tool) => matchesTool(tool, query));
+    if (query && tools.length === 0) return;
+
+    const group = document.createElement("section");
+    group.className = "app-sidebar-group";
+    const collapsed = collapsedSidebarCategories.has(category);
+    group.classList.toggle("collapsed", collapsed);
+
+    const header = document.createElement("button");
+    header.className = "app-sidebar-category";
+    header.type = "button";
+    header.innerHTML = `<span>${escapeHtml(category)}</span><span class="app-sidebar-count">${tools.length}</span>`;
+    header.addEventListener("click", () => {
+      if (collapsedSidebarCategories.has(category)) {
+        collapsedSidebarCategories.delete(category);
+      } else {
+        collapsedSidebarCategories.add(category);
+      }
+      renderSidebarTools();
+    });
+
+    const list = document.createElement("div");
+    list.className = "app-sidebar-list";
+    tools.forEach((tool) => {
+      const button = document.createElement("button");
+      button.className = "app-sidebar-tool";
+      button.type = "button";
+      button.classList.toggle("active", tool.id === activeTool.id && !$("toolView").hidden);
+      button.innerHTML = `<span>${tool.name}</span><small>${tool.desc}</small>`;
+      button.addEventListener("click", () => selectTool(tool.id));
+      list.appendChild(button);
+    });
+
+    group.append(header, list);
+    nav.appendChild(group);
+  });
+}
+
+function renderHomeTools() {
+  const query = $("homeToolSearch").value.trim();
+  const filtered = toolCatalog.filter((tool) => matchesTool(tool, query));
+  $("toolListTitle").textContent = "全部工具";
+  $("toolResultCount").textContent = `${filtered.length} 个`;
+
+  const groups = $("toolGroups");
+  const empty = $("emptyTools");
+  groups.innerHTML = "";
+  empty.hidden = filtered.length > 0;
+
+  homeCategoryOrder.filter((category) => filtered.some((tool) => tool.category === category)).forEach((category) => {
+    const section = document.createElement("section");
+    section.className = "tool-group";
+    const heading = document.createElement("h3");
+    heading.textContent = category;
+    section.appendChild(heading);
+
+    const list = document.createElement("div");
+    list.className = "tool-list";
+    filtered.filter((tool) => tool.category === category).forEach((tool) => list.appendChild(renderToolRow(tool)));
+    section.appendChild(list);
+    groups.appendChild(section);
+  });
+}
+
+function renderToolRow(tool) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "tool-row";
+  button.innerHTML = `
+    <span class="tool-row-main">
+      <span class="tool-row-name">${escapeHtml(tool.name)}</span>
+      <span class="tool-row-desc">${escapeHtml(tool.desc)}</span>
+    </span>
+    <span class="tool-row-meta">${escapeHtml(tool.category)}</span>
+    <span class="tool-row-arrow">打开</span>
+  `;
+  button.addEventListener("click", () => selectTool(tool.id));
+  return button;
+}
+
+function showHome() {
+  $("homeView").hidden = false;
+  $("toolView").hidden = true;
+  renderSidebarTools();
+  renderHomeTools();
+}
+
+function selectTool(id) {
+  activeTool = toolCatalog.find((tool) => tool.id === id) || toolCatalog[0];
+  activeAction = activeTool.actions.find((action) => action.primary)?.id || activeTool.actions[0].id;
+  const isJSONTool = activeTool.id === "json";
+
+  $("homeView").hidden = true;
+  $("toolView").hidden = false;
+  $("toolCategory").textContent = activeTool.category;
+  $("toolName").textContent = activeTool.name;
+  $("toolDesc").textContent = activeTool.desc;
+  $("genericWorkspace").hidden = isJSONTool;
+  $("jsonWorkspace").hidden = !isJSONTool;
+  if (isJSONTool) {
+    resetJSONWorkspace();
+    renderSidebarTools();
     return;
   }
 
-  categoryOrder
-    .filter((category) => filtered.some((tool) => tool.category === category))
-    .forEach((category) => {
-      const group = document.createElement("section");
-      group.className = "tool-group";
-      const categoryTools = filtered.filter((tool) => tool.category === category);
-      group.innerHTML = `<div class="tool-category"><span>${category}</span><small>${categoryTools.length}</small></div>`;
-      categoryTools.forEach((tool) => {
-        const button = document.createElement("button");
-        button.className = "tool-button";
-        button.classList.toggle("active", tool.id === activeTool.id);
-        button.innerHTML = `<strong>${tool.name}</strong><span>${tool.category}</span><small>${tool.desc}</small>`;
-        button.addEventListener("click", () => selectTool(tool.id));
-        group.appendChild(button);
-      });
-      nav.appendChild(group);
-    });
+  $("inputText").placeholder = activeTool.placeholder;
+  $("inputText").value = "";
+  $("outputText").value = "";
+  setStatus("", false);
+  renderDetails();
+  renderActions();
+  renderOptions();
+  renderSidebarTools();
+}
+
+function renderActions() {
+  const primary = activeTool.actions.find((action) => action.primary) || activeTool.actions[0];
+  const secondary = activeTool.actions.find((action) => !action.primary);
+  $("primaryAction").textContent = primary.label;
+  $("primaryAction").dataset.action = primary.id;
+  $("secondaryAction").hidden = !secondary;
+  if (secondary) {
+    $("secondaryAction").textContent = secondary.label;
+    $("secondaryAction").dataset.action = secondary.id;
+  }
+
+  const extraActions = activeTool.actions.filter((action) => !action.primary).slice(1);
+  document.querySelectorAll(".dynamic-action").forEach((button) => button.remove());
+  let insertBefore = $("clearInput");
+  extraActions.forEach((action) => {
+    const button = document.createElement("button");
+    button.className = "btn secondary dynamic-action";
+    button.type = "button";
+    button.textContent = action.label;
+    button.dataset.action = action.id;
+    button.addEventListener("click", () => runTool(action.id));
+    insertBefore.parentElement.insertBefore(button, insertBefore);
+  });
 }
 
 function renderOptions() {
@@ -224,96 +324,21 @@ function renderOptions() {
   });
 }
 
-async function selectTool(id, options = {}) {
-  activeTool = tools.find((tool) => tool.id === id) || tools[0];
-  $("toolName").textContent = activeTool.name;
-  $("toolCategory").textContent = activeTool.category;
-  $("inputText").placeholder = activeTool.placeholder;
-  $("primaryAction").textContent = "转换并保存";
-  $("outputText").value = "";
-  $("statusText").textContent = "";
-  renderDetails();
-  renderTools();
-  renderOptions();
-  if (!options.keepHistory) {
-    await refreshHistory();
-  }
-}
-
-async function runTransform() {
+async function runTool(action) {
   const input = $("inputText").value;
   if (!input.trim()) {
     setStatus("请输入内容", true);
     return;
   }
-
   try {
     setStatus("处理中...", false);
-    const result = await activeTool.transform(input);
+    const result = await activeTool.run(action || activeAction, input);
     $("outputText").value = result.output;
     renderDetails(result.details);
-    await historyService.Create({
-      tool: activeTool.id,
-      title: activeTool.name,
-      input,
-      output: result.output
-    });
-    setStatus("已转换并保存", false);
-    await refreshHistory();
+    setStatus("已完成", false);
   } catch (error) {
     setStatus(error instanceof Error ? error.message : String(error), true);
   }
-}
-
-async function refreshHistory() {
-  const tool = historyScope === "current" ? activeTool.id : "";
-  historyItems = await historyService.List(tool, 100) || [];
-  renderHistoryScope();
-  renderHistory();
-}
-
-function renderHistory() {
-  const query = $("historySearch").value.trim().toLowerCase();
-  const list = $("historyList");
-  list.innerHTML = "";
-
-  const filtered = historyItems.filter((item) => `${historyTitle(item)} ${item.input} ${item.output}`.toLowerCase().includes(query));
-  if (filtered.length === 0) {
-    list.innerHTML = `<div class="empty">暂无历史</div>`;
-    return;
-  }
-
-  filtered.forEach((item) => {
-    const row = document.createElement("article");
-    row.className = "history-item";
-    row.innerHTML = `
-      <button class="history-load">
-        <strong>${escapeHtml(historyTitle(item))}</strong>
-        <span>${formatTime(item.createdAt)}</span>
-        <small>${escapeHtml(item.input || item.output)}</small>
-      </button>
-      <button class="history-delete">删除</button>
-    `;
-    row.querySelector(".history-load").addEventListener("click", async () => {
-      if (item.tool && item.tool !== activeTool.id) {
-        await selectTool(item.tool, { keepHistory: true });
-      }
-      $("inputText").value = item.input || "";
-      $("outputText").value = item.output || "";
-      renderDetails();
-      setStatus("已载入历史", false);
-    });
-    row.querySelector(".history-delete").addEventListener("click", async () => {
-      await historyService.Delete(item.id);
-      await refreshHistory();
-    });
-    list.appendChild(row);
-  });
-}
-
-function renderHistoryScope() {
-  $("historyCurrent").classList.toggle("active", historyScope === "current");
-  $("historyAll").classList.toggle("active", historyScope === "all");
 }
 
 function renderDetails(details = []) {
@@ -328,10 +353,275 @@ function renderDetails(details = []) {
   });
 }
 
-function jsonToRows(value, prefix = "$") {
-  if (value === null || typeof value !== "object") {
-    return [{ path: prefix, value: JSON.stringify(value) }];
+function resetJSONWorkspace() {
+  $("jsonInput").value = "";
+  $("jsonOutput").value = "";
+  $("jsonOutputEditor").hidden = true;
+  $("jsonOutput").classList.remove("json-output-source-hidden");
+  setJSONStatus("", false);
+  setJSONOutputReady(false);
+  clearJSONTableView();
+}
+
+function formatJSON() {
+  const input = $("jsonInput").value.trim();
+  if (!input) {
+    setJSONStatus("输入为空", true);
+    return;
   }
+  try {
+    const formatted = utils.formatJSONText(input, 2);
+    setJSONOutput(formatted, true);
+    setJSONStatus("格式化完成", false);
+  } catch (error) {
+    setJSONOutput("", false);
+    clearJSONTableView();
+    setJSONStatus(error instanceof Error ? error.message : String(error), true);
+  }
+}
+
+function minifyJSON() {
+  const input = $("jsonInput").value.trim();
+  if (!input) {
+    setJSONStatus("输入为空", true);
+    return;
+  }
+  try {
+    const minified = utils.minifyJSONText(input);
+    setJSONOutput(minified, false);
+    setJSONStatus("压缩完成", false);
+  } catch (error) {
+    setJSONOutput("", false);
+    clearJSONTableView();
+    setJSONStatus(error instanceof Error ? error.message : String(error), true);
+  }
+}
+
+function setJSONOutput(text, showEditor) {
+  $("jsonOutput").value = text;
+  setJSONOutputReady(Boolean(text));
+  clearJSONTableView();
+  if (showEditor && text) {
+    renderJSONEditor(text);
+    $("jsonOutput").classList.add("json-output-source-hidden");
+    $("jsonOutputEditor").hidden = false;
+    return;
+  }
+  $("jsonOutput").classList.remove("json-output-source-hidden");
+  $("jsonOutputEditor").hidden = true;
+}
+
+function setJSONOutputReady(ready) {
+  ["jsonCopy", "jsonSave", "jsonTableButton"].forEach((id) => {
+    $(id).disabled = !ready;
+  });
+}
+
+function renderJSONEditor(text) {
+  const editor = $("jsonOutputEditor");
+  const lines = text.split("\n");
+  editor.innerHTML = lines.map((line, index) => `
+    <div class="json-line">
+      <span class="json-line-number">${index + 1}</span>
+      <code class="json-line-code">${highlightJSONLine(line) || "&nbsp;"}</code>
+    </div>
+  `).join("");
+}
+
+function highlightJSONLine(line) {
+  return escapeHtml(line).replace(/(&quot;(?:\\.|[^&])*?&quot;)(\s*:)?|-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?|\btrue\b|\bfalse\b|\bnull\b/g, (match, stringToken, colon) => {
+    if (stringToken) {
+      return `<span class="${colon ? "json-key" : "json-string"}">${stringToken}</span>${colon || ""}`;
+    }
+    if (match === "true" || match === "false") return `<span class="json-boolean">${match}</span>`;
+    if (match === "null") return `<span class="json-null">${match}</span>`;
+    return `<span class="json-number">${match}</span>`;
+  });
+}
+
+function showJSONTableView() {
+  const text = $("jsonOutput").value.trim();
+  if (!text) {
+    setJSONStatus("没有可转换的 JSON 输出", true);
+    clearJSONTableView();
+    return;
+  }
+  try {
+    const value = JSON.parse(text);
+    jsonTableRows = normalizeJSONTableRows(value);
+    const fields = collectJSONTableFields(jsonTableRows);
+    if (!fields.length) throw new Error("没有可展示的字段");
+    renderJSONFieldList(fields);
+    renderJSONTable(fields);
+    $("jsonTableCard").hidden = false;
+    setJSONStatus("表格视图已生成", false);
+  } catch (error) {
+    clearJSONTableView();
+    setJSONStatus(`表格视图生成失败：${error instanceof Error ? error.message : String(error)}`, true);
+  }
+}
+
+function normalizeJSONTableRows(value) {
+  const rows = Array.isArray(value) ? value : [value];
+  if (!rows.length) throw new Error("JSON 数组为空");
+  return rows.map((row, index) => {
+    if (row && typeof row === "object" && !Array.isArray(row)) return row;
+    return { index, value: row };
+  });
+}
+
+function collectJSONTableFields(rows) {
+  const fields = [];
+  const seen = new Set();
+  rows.forEach((row) => {
+    Object.keys(row).forEach((key) => {
+      if (seen.has(key)) return;
+      seen.add(key);
+      fields.push(key);
+    });
+  });
+  return fields;
+}
+
+function renderJSONFieldList(fields) {
+  const fieldList = $("jsonFieldList");
+  fieldList.replaceChildren();
+  fields.forEach((field) => {
+    const label = document.createElement("label");
+    label.className = "json-field-item";
+
+    const input = document.createElement("input");
+    input.type = "checkbox";
+    input.value = field;
+    input.checked = true;
+    input.addEventListener("change", () => renderJSONTable());
+
+    const text = document.createElement("span");
+    text.textContent = field;
+
+    label.append(input, text);
+    fieldList.appendChild(label);
+  });
+}
+
+function renderJSONTable(fields) {
+  const selectedFields = fields?.length ? fields : Array.from(document.querySelectorAll("#jsonFieldList input:checked")).map((input) => input.value);
+  $("jsonTableSummary").textContent = `${jsonTableRows.length} 行 / ${selectedFields.length} 列`;
+
+  if (!selectedFields.length) {
+    $("jsonTableContainer").innerHTML = `<div class="empty-state">请至少选择一个字段</div>`;
+    return;
+  }
+
+  const table = document.createElement("table");
+  table.className = "json-data-table";
+  const thead = document.createElement("thead");
+  const headerRow = document.createElement("tr");
+  selectedFields.forEach((field) => {
+    const th = document.createElement("th");
+    th.textContent = field;
+    headerRow.appendChild(th);
+  });
+  thead.appendChild(headerRow);
+  table.appendChild(thead);
+
+  const tbody = document.createElement("tbody");
+  jsonTableRows.forEach((row) => {
+    const tr = document.createElement("tr");
+    selectedFields.forEach((field) => {
+      const td = document.createElement("td");
+      const content = document.createElement("div");
+      content.className = "json-cell-content";
+      content.textContent = formatJSONTableCell(row[field]);
+      td.appendChild(content);
+      tr.appendChild(td);
+    });
+    tbody.appendChild(tr);
+  });
+  table.appendChild(tbody);
+  $("jsonTableContainer").replaceChildren(table);
+}
+
+function clearJSONTableView() {
+  jsonTableRows = [];
+  $("jsonTableCard").hidden = true;
+  $("jsonFieldList").replaceChildren();
+  $("jsonTableContainer").replaceChildren();
+  $("jsonTableSummary").textContent = "";
+}
+
+function formatJSONTableCell(value) {
+  if (value === null || value === undefined) return "";
+  if (typeof value === "object") return JSON.stringify(value);
+  return String(value);
+}
+
+function setJSONStatus(text, isError) {
+  $("jsonStatus").textContent = text;
+  $("jsonStatus").classList.toggle("error", Boolean(isError));
+}
+
+function toggleJSONOutputEditor(showEditor) {
+  const text = $("jsonOutput").value.trim();
+  if (!text) return;
+  if (showEditor) {
+    try {
+      const formatted = JSON.stringify(JSON.parse(text), null, 2);
+      $("jsonOutput").value = formatted;
+      renderJSONEditor(formatted);
+      $("jsonOutput").classList.add("json-output-source-hidden");
+      $("jsonOutputEditor").hidden = false;
+    } catch (error) {
+      setJSONStatus(error instanceof Error ? error.message : String(error), true);
+    }
+    return;
+  }
+  try {
+    const minified = JSON.stringify(JSON.parse(text));
+    $("jsonOutput").value = minified;
+    $("jsonOutput").classList.remove("json-output-source-hidden");
+    $("jsonOutputEditor").hidden = true;
+  } catch (error) {
+    setJSONStatus(error instanceof Error ? error.message : String(error), true);
+  }
+}
+
+function saveJSONOutput() {
+  const text = $("jsonOutput").value;
+  if (!text) return;
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(new Blob([text], { type: "application/json;charset=utf-8" }));
+  link.download = "wrench-output.json";
+  link.click();
+  URL.revokeObjectURL(link.href);
+}
+
+function openFullscreen(title, text) {
+  let overlay = $("fullscreenOverlay");
+  if (!overlay) {
+    overlay = document.createElement("div");
+    overlay.id = "fullscreenOverlay";
+    overlay.className = "fullscreen-overlay";
+    overlay.innerHTML = `
+      <div class="fullscreen-header">
+        <div class="fullscreen-title"></div>
+        <button class="btn secondary" id="fullscreenClose" type="button">关闭</button>
+      </div>
+      <textarea class="fullscreen-textarea" spellcheck="false"></textarea>
+    `;
+    document.body.appendChild(overlay);
+    $("fullscreenClose").addEventListener("click", () => overlay.classList.remove("active"));
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") overlay.classList.remove("active");
+    });
+  }
+  overlay.querySelector(".fullscreen-title").textContent = title;
+  overlay.querySelector(".fullscreen-textarea").value = text;
+  overlay.classList.add("active");
+}
+
+function jsonToRows(value, prefix = "$") {
+  if (value === null || typeof value !== "object") return [{ path: prefix, value: JSON.stringify(value) }];
   const rows = [];
   const entries = Array.isArray(value) ? value.map((item, index) => [index, item]) : Object.entries(value);
   entries.forEach(([key, child]) => {
@@ -346,26 +636,9 @@ function optionValue(id) {
   return el ? el.value : "";
 }
 
-function matchesTool(tool, query) {
-  if (!query) return true;
-  return [tool.name, tool.category, tool.desc, tool.id].join(" ").toLowerCase().includes(query);
-}
-
-function historyTitle(item) {
-  const tool = tools.find((candidate) => candidate.id === item.tool);
-  if (historyScope === "all" && tool) {
-    return `${tool.name} · ${item.title || summarize(item.input) || item.tool}`;
-  }
-  return item.title || item.tool;
-}
-
 function setStatus(text, isError) {
   $("statusText").textContent = text;
   $("statusText").classList.toggle("error", Boolean(isError));
-}
-
-function summarize(text) {
-  return String(text || "").replace(/\s+/g, " ").trim().slice(0, 48);
 }
 
 function formatKey(value) {
@@ -389,14 +662,8 @@ function escapeHtml(text) {
   })[char]);
 }
 
-function formatTime(value) {
-  if (!value) return "";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "";
-  return date.toLocaleString();
-}
-
-$("primaryAction").addEventListener("click", runTransform);
+$("primaryAction").addEventListener("click", () => runTool($("primaryAction").dataset.action));
+$("secondaryAction").addEventListener("click", () => runTool($("secondaryAction").dataset.action));
 $("copyOutput").addEventListener("click", async () => {
   await navigator.clipboard.writeText($("outputText").value);
   setStatus("已复制", false);
@@ -407,20 +674,44 @@ $("clearInput").addEventListener("click", () => {
   renderDetails();
   setStatus("", false);
 });
-$("clearHistory").addEventListener("click", async () => {
-  await historyService.Clear(historyScope === "current" ? activeTool.id : "");
-  await refreshHistory();
+$("fullscreenInput").addEventListener("click", () => openFullscreen("输入", $("inputText").value));
+$("fullscreenOutput").addEventListener("click", () => openFullscreen("输出", $("outputText").value));
+$("inputText").addEventListener("keydown", (event) => {
+  if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
+    event.preventDefault();
+    runTool($("primaryAction").dataset.action);
+  }
 });
-$("historySearch").addEventListener("input", renderHistory);
-$("toolSearch").addEventListener("input", renderTools);
-$("historyCurrent").addEventListener("click", async () => {
-  historyScope = "current";
-  await refreshHistory();
+$("jsonFormat").addEventListener("click", formatJSON);
+$("jsonMinify").addEventListener("click", minifyJSON);
+$("jsonClear").addEventListener("click", resetJSONWorkspace);
+$("jsonCopy").addEventListener("click", async () => {
+  await navigator.clipboard.writeText($("jsonOutput").value);
+  setJSONStatus("已复制", false);
 });
-$("historyAll").addEventListener("click", async () => {
-  historyScope = "all";
-  await refreshHistory();
+$("jsonSave").addEventListener("click", saveJSONOutput);
+$("jsonTableButton").addEventListener("click", showJSONTableView);
+$("jsonExpand").addEventListener("click", () => toggleJSONOutputEditor(true));
+$("jsonCollapse").addEventListener("click", () => toggleJSONOutputEditor(false));
+$("jsonFullscreenInput").addEventListener("click", () => openFullscreen("输入", $("jsonInput").value));
+$("jsonFullscreenOutput").addEventListener("click", () => openFullscreen("输出", $("jsonOutput").value));
+$("jsonInput").addEventListener("keydown", (event) => {
+  if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
+    event.preventDefault();
+    formatJSON();
+  }
+});
+$("backHome").addEventListener("click", showHome);
+$("toolSearch").addEventListener("input", renderSidebarTools);
+$("toolSearchClear").addEventListener("click", () => {
+  $("toolSearch").value = "";
+  renderSidebarTools();
+});
+$("homeToolSearch").addEventListener("input", renderHomeTools);
+$("homeToolSearchClear").addEventListener("click", () => {
+  $("homeToolSearch").value = "";
+  renderHomeTools();
 });
 
-$("historyPath").textContent = await historyService.DataPath();
-await selectTool(activeTool.id);
+renderSidebarTools();
+renderHomeTools();

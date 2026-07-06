@@ -8,65 +8,135 @@
 </head>
 <body>
   <div class="app-shell">
-    <aside class="sidebar">
-      <div class="brand">
-        <div class="brand-mark">W</div>
-        <div>
-          <strong>Wrench Desktop</strong>
-          <span>本地历史自动保存</span>
+    <aside class="app-sidebar">
+      <div class="app-sidebar-brand">
+        <div class="app-sidebar-logo">W</div>
+        <div class="app-sidebar-brand-text">
+          <strong>Wrench</strong>
+          <span>🔒 无数据上传</span>
         </div>
       </div>
-      <input id="toolSearch" class="tool-search" type="search" placeholder="搜索工具、分类或用途">
-      <nav class="tool-nav" id="toolNav"></nav>
+      <div class="app-sidebar-search">
+        <input id="toolSearch" type="search" placeholder="搜索工具、别名或用途" autocomplete="off">
+        <button id="toolSearchClear" class="btn secondary" type="button">清空</button>
+      </div>
+      <nav id="sidebarTools" class="app-sidebar-tools" aria-label="工具列表"></nav>
     </aside>
 
-    <main class="workspace">
-      <header class="workspace-header">
-        <div>
-          <p id="toolCategory" class="eyebrow"></p>
-          <h1 id="toolName"></h1>
+    <main class="app-main">
+      <div id="homeView" class="container">
+        <div class="home-hero">
+          <div class="home-privacy-brand">
+            <div>
+              <div class="home-privacy-title">🛠️ Wrench <span>🚫 内容不上传服务器</span></div>
+              <div class="home-privacy-subtitle">💡 智能识别联动 · 浏览器本地处理</div>
+            </div>
+          </div>
+          <div class="home-hero-search">
+            <input id="homeToolSearch" type="search" placeholder="搜索工具、别名或用途，例如 b64、csr、json" autocomplete="off">
+            <button class="btn" id="homeToolSearchClear" type="button">清空</button>
+          </div>
         </div>
-        <span class="save-state">转换后自动保存</span>
-      </header>
 
-      <div id="toolOptions" class="tool-options"></div>
-
-      <div class="actions">
-        <button id="primaryAction">转换并保存</button>
-        <button id="copyOutput" class="secondary">复制输出</button>
-        <button id="clearInput" class="secondary">清空</button>
-        <span id="statusText" class="status"></span>
+        <main class="tool-board">
+          <section class="tool-section">
+            <div class="section-title">
+              <h2 id="toolListTitle">全部工具</h2>
+              <span id="toolResultCount" class="section-count"></span>
+            </div>
+            <div id="toolGroups" class="tool-groups"></div>
+            <div id="emptyTools" class="empty-state" hidden>没有匹配的工具</div>
+          </section>
+        </main>
       </div>
 
-      <section class="editor-grid">
-        <label class="editor-panel">
-          <span>输入</span>
-          <textarea id="inputText" spellcheck="false"></textarea>
-        </label>
-        <label class="editor-panel">
-          <span>输出</span>
-          <textarea id="outputText" spellcheck="false" readonly></textarea>
-        </label>
-      </section>
+      <div id="toolView" class="container tool-view" hidden>
+        <header class="tool-header">
+          <div>
+            <button id="backHome" class="btn secondary" type="button">全部工具</button>
+            <p id="toolCategory" class="eyebrow"></p>
+            <h1 id="toolName"></h1>
+            <p id="toolDesc" class="tool-desc"></p>
+          </div>
+        </header>
 
-      <section id="resultDetails" class="result-details" hidden></section>
+        <div id="genericWorkspace">
+          <section class="generic-grid">
+            <div class="card half">
+              <h2>输入</h2>
+              <div class="toolbar generic-input-toolbar">
+                <button id="primaryAction" class="btn" type="button">转换</button>
+                <button id="secondaryAction" class="btn secondary" type="button" hidden></button>
+                <button id="clearInput" class="btn secondary" type="button">清空</button>
+                <button id="fullscreenInput" class="btn secondary" type="button">全屏</button>
+                <div class="small">快捷键：<span class="kbd">Ctrl</span>/<span class="kbd">Cmd</span> + <span class="kbd">Enter</span></div>
+              </div>
+              <section id="toolOptions" class="tool-options" hidden></section>
+              <textarea id="inputText" spellcheck="false"></textarea>
+              <div id="statusText" class="status"></div>
+            </div>
+            <div class="card half">
+              <h2>输出</h2>
+              <div class="toolbar">
+                <button id="copyOutput" class="btn secondary" type="button">复制输出</button>
+                <button id="fullscreenOutput" class="btn secondary" type="button">全屏</button>
+              </div>
+              <textarea id="outputText" spellcheck="false" readonly></textarea>
+            </div>
+          </section>
+
+          <section id="resultDetails" class="card result-details" hidden></section>
+        </div>
+
+        <div id="jsonWorkspace" class="json-workspace" hidden>
+          <section class="json-grid">
+            <div class="card half">
+              <h2>输入</h2>
+              <div class="toolbar">
+                <button class="btn" id="jsonFormat" type="button">格式化</button>
+                <button class="btn secondary" id="jsonMinify" type="button">压缩</button>
+                <button class="btn secondary" id="jsonClear" type="button">清空</button>
+                <button class="btn secondary" id="jsonFullscreenInput" type="button">全屏</button>
+                <div class="small">快捷键：<span class="kbd">Ctrl</span>/<span class="kbd">Cmd</span> + <span class="kbd">Enter</span></div>
+              </div>
+              <textarea class="textarea" id="jsonInput" spellcheck="false" placeholder='粘贴 JSON 数据，例如：
+
+{"name":"test","age":18,"items":["a","b","c"]}
+
+也支持日志行里夹带 JSON：
+
+2026-06-03T10:24:59 stderr F {"ok":true}'></textarea>
+              <div id="jsonStatus" class="status"></div>
+            </div>
+
+            <div class="card half">
+              <h2>输出</h2>
+              <div class="toolbar">
+                <button class="btn secondary" id="jsonCopy" type="button" disabled>复制</button>
+                <button class="btn secondary" id="jsonFullscreenOutput" type="button">全屏</button>
+                <button class="btn secondary" id="jsonSave" type="button" disabled>保存文件</button>
+                <button class="btn secondary" id="jsonExpand" type="button">展开全部</button>
+                <button class="btn secondary" id="jsonCollapse" type="button">收起全部</button>
+                <button class="btn secondary" id="jsonTableButton" type="button" disabled>表格视图</button>
+              </div>
+              <div class="json-output-box">
+                <textarea class="textarea json-output-source" id="jsonOutput" spellcheck="false" placeholder="格式化或压缩后的结果将显示在这里"></textarea>
+                <div class="json-editor" id="jsonOutputEditor" hidden></div>
+              </div>
+            </div>
+
+            <div class="card json-table-card" id="jsonTableCard" hidden>
+              <div class="section-title">
+                <h2>表格视图</h2>
+                <span id="jsonTableSummary"></span>
+              </div>
+              <div class="json-field-list" id="jsonFieldList"></div>
+              <div class="json-table-wrap" id="jsonTableContainer"></div>
+            </div>
+          </section>
+        </div>
+      </div>
     </main>
-
-    <aside class="history-panel">
-      <div class="history-head">
-        <div>
-          <strong>历史记录</strong>
-          <span id="historyPath"></span>
-        </div>
-        <button id="clearHistory" class="danger">清空</button>
-      </div>
-      <div class="history-scope" role="group" aria-label="历史范围">
-        <button id="historyCurrent" class="scope-button active" type="button">当前工具</button>
-        <button id="historyAll" class="scope-button" type="button">全部历史</button>
-      </div>
-      <input id="historySearch" class="history-search" type="search" placeholder="搜索历史">
-      <div id="historyList" class="history-list"></div>
-    </aside>
   </div>
 
   <script type="module" src="./src/main.js"></script>
