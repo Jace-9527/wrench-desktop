@@ -186,6 +186,12 @@ async function loadHistoryService() {
 }
 
 const historyService = await loadHistoryService();
+const panelState = {
+  leftWidth: readNumberSetting("wrench-left-panel-width", 300),
+  rightWidth: readNumberSetting("wrench-right-panel-width", 340),
+  leftCollapsed: localStorage.getItem("wrench-left-panel-collapsed") === "true",
+  rightCollapsed: localStorage.getItem("wrench-right-panel-collapsed") === "true"
+};
 
 function matchesTool(tool, query) {
   if (!query) return true;
@@ -801,6 +807,75 @@ function formatTime(value) {
   return date.toLocaleString();
 }
 
+function readNumberSetting(key, fallback) {
+  const value = Number(localStorage.getItem(key));
+  return Number.isFinite(value) ? value : fallback;
+}
+
+function clamp(value, min, max) {
+  return Math.min(Math.max(value, min), max);
+}
+
+function applyPanelState() {
+  const leftWidth = clamp(panelState.leftWidth, 220, 460);
+  const rightWidth = clamp(panelState.rightWidth, 260, 560);
+  panelState.leftWidth = leftWidth;
+  panelState.rightWidth = rightWidth;
+  document.documentElement.style.setProperty("--left-panel-width", `${leftWidth}px`);
+  document.documentElement.style.setProperty("--right-panel-width", `${rightWidth}px`);
+  document.body.classList.toggle("left-panel-collapsed", panelState.leftCollapsed);
+  document.body.classList.toggle("right-panel-collapsed", panelState.rightCollapsed);
+  $("toggleLeftPanel").textContent = panelState.leftCollapsed ? "›" : "‹";
+  $("toggleRightPanel").textContent = panelState.rightCollapsed ? "‹" : "›";
+}
+
+function persistPanelState() {
+  localStorage.setItem("wrench-left-panel-width", String(panelState.leftWidth));
+  localStorage.setItem("wrench-right-panel-width", String(panelState.rightWidth));
+  localStorage.setItem("wrench-left-panel-collapsed", String(panelState.leftCollapsed));
+  localStorage.setItem("wrench-right-panel-collapsed", String(panelState.rightCollapsed));
+}
+
+function togglePanel(side, collapsed) {
+  if (side === "left") {
+    panelState.leftCollapsed = collapsed ?? !panelState.leftCollapsed;
+  } else {
+    panelState.rightCollapsed = collapsed ?? !panelState.rightCollapsed;
+  }
+  applyPanelState();
+  persistPanelState();
+}
+
+function bindPanelResize(handle, side) {
+  handle.addEventListener("pointerdown", (event) => {
+    if ((side === "left" && panelState.leftCollapsed) || (side === "right" && panelState.rightCollapsed)) return;
+    event.preventDefault();
+    handle.setPointerCapture(event.pointerId);
+    document.body.classList.add("resizing-panels");
+
+    const onMove = (moveEvent) => {
+      if (side === "left") {
+        panelState.leftWidth = clamp(moveEvent.clientX, 220, 460);
+      } else {
+        panelState.rightWidth = clamp(window.innerWidth - moveEvent.clientX, 260, 560);
+      }
+      applyPanelState();
+    };
+
+    const onUp = () => {
+      document.body.classList.remove("resizing-panels");
+      persistPanelState();
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onUp);
+    };
+
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onUp);
+  });
+}
+
 function escapeHtml(text) {
   return String(text).replace(/[&<>"']/g, (char) => ({
     "&": "&amp;",
@@ -875,7 +950,14 @@ $("clearHistory").addEventListener("click", async () => {
   await historyService.Clear(tool);
   await refreshHistory();
 });
+$("toggleLeftPanel").addEventListener("click", () => togglePanel("left"));
+$("leftPanelExpand").addEventListener("click", () => togglePanel("left", false));
+$("toggleRightPanel").addEventListener("click", () => togglePanel("right"));
+$("rightPanelExpand").addEventListener("click", () => togglePanel("right", false));
+bindPanelResize($("leftResizeHandle"), "left");
+bindPanelResize($("rightResizeHandle"), "right");
 
+applyPanelState();
 renderSidebarTools();
 renderHomeTools();
 refreshHistory();

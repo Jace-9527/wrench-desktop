@@ -1,5 +1,7 @@
 :root {
   color-scheme: dark;
+  --left-panel-width: 300px;
+  --right-panel-width: 340px;
   --bg: #0b1220;
   --panel: #121b2e;
   --panel2: #0f172a;
@@ -36,13 +38,27 @@ button { cursor: pointer; }
 .app-shell {
   min-height: 100vh;
   display: grid;
-  grid-template-columns: 300px minmax(0, 1fr) 340px;
+  grid-template-columns: var(--left-panel-width) minmax(0, 1fr) var(--right-panel-width);
+}
+
+body.left-panel-collapsed {
+  --left-panel-width: 44px;
+}
+
+body.right-panel-collapsed {
+  --right-panel-width: 44px;
+}
+
+body.resizing-panels {
+  cursor: col-resize;
+  user-select: none;
 }
 
 .app-sidebar {
   position: sticky;
   top: 0;
   height: 100vh;
+  min-width: 0;
   overflow-y: auto;
   border-right: 1px solid var(--border);
   background: rgba(7, 11, 20, 0.78);
@@ -62,6 +78,117 @@ button { cursor: pointer; }
   align-items: center;
   gap: 10px;
   padding: 2px 2px 16px;
+}
+
+.panel-toggle,
+.panel-rail-button {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.78);
+  color: var(--text);
+  padding: 0;
+}
+
+.panel-toggle {
+  margin-left: auto;
+  flex: 0 0 auto;
+}
+
+.panel-rail-button {
+  display: none;
+  position: sticky;
+  top: 18px;
+  margin: 0 auto;
+}
+
+.resize-handle {
+  position: fixed;
+  top: 0;
+  z-index: 20;
+  width: 8px;
+  height: 100vh;
+  cursor: col-resize;
+}
+
+.resize-handle::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: transparent;
+}
+
+.resize-handle:hover::after,
+body.resizing-panels .resize-handle::after {
+  background: rgba(96, 165, 250, 0.45);
+}
+
+.resize-handle-left {
+  left: calc(var(--left-panel-width) - 4px);
+}
+
+.resize-handle-left::after {
+  left: 3px;
+}
+
+.resize-handle-right {
+  right: calc(var(--right-panel-width) - 4px);
+}
+
+.resize-handle-right::after {
+  right: 3px;
+}
+
+body.left-panel-collapsed .app-sidebar {
+  overflow: hidden;
+  padding: 12px 8px;
+}
+
+body.left-panel-collapsed .app-sidebar-brand-text,
+body.left-panel-collapsed .app-sidebar-search,
+body.left-panel-collapsed .app-sidebar-tools,
+body.left-panel-collapsed #toggleLeftPanel,
+body.left-panel-collapsed #leftResizeHandle {
+  display: none;
+}
+
+body.left-panel-collapsed .app-sidebar-brand {
+  justify-content: center;
+  padding: 0;
+}
+
+body.left-panel-collapsed .app-sidebar-logo {
+  width: 28px;
+  height: 28px;
+  font-size: 14px;
+}
+
+body.left-panel-collapsed #leftPanelExpand {
+  display: grid;
+  margin-top: 12px;
+}
+
+body.right-panel-collapsed .history-panel {
+  overflow: hidden;
+  padding: 12px 8px;
+}
+
+body.right-panel-collapsed .history-head,
+body.right-panel-collapsed .history-scope,
+body.right-panel-collapsed .history-search,
+body.right-panel-collapsed .history-list,
+body.right-panel-collapsed #toggleRightPanel,
+body.right-panel-collapsed #rightResizeHandle {
+  display: none;
+}
+
+body.right-panel-collapsed #rightPanelExpand {
+  display: grid;
 }
 
 .app-sidebar-logo {
@@ -264,12 +391,27 @@ textarea:focus {
   padding: 18px;
 }
 
+.history-panel-toggle {
+  position: absolute;
+  top: 18px;
+  left: -14px;
+  z-index: 30;
+  margin: 0;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.28);
+}
+
 .history-head {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
   margin-bottom: 14px;
+}
+
+.history-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .history-head strong,
@@ -943,6 +1085,13 @@ textarea {
 
 @media (max-width: 900px) {
   .app-shell { grid-template-columns: 1fr; }
+
+  body.left-panel-collapsed,
+  body.right-panel-collapsed {
+    --left-panel-width: 100%;
+    --right-panel-width: 100%;
+  }
+
   .app-sidebar {
     position: static;
     height: auto;
@@ -950,11 +1099,21 @@ textarea {
     border-bottom: 1px solid var(--border);
   }
 
+  body.left-panel-collapsed .app-sidebar,
+  body.right-panel-collapsed .history-panel {
+    display: none;
+  }
+
   .history-panel {
     position: static;
     height: auto;
     border-left: 0;
     border-top: 1px solid var(--border);
+  }
+
+  .resize-handle,
+  .panel-rail-button {
+    display: none !important;
   }
   .editor-grid,
   .generic-grid,

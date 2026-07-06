@@ -15,12 +15,15 @@
           <strong>Wrench</strong>
           <span>🔒 无数据上传</span>
         </div>
+        <button id="toggleLeftPanel" class="panel-toggle" type="button" title="折叠左侧栏">‹</button>
       </div>
       <div class="app-sidebar-search">
         <input id="toolSearch" type="search" placeholder="搜索工具、别名或用途" autocomplete="off">
         <button id="toolSearchClear" class="btn secondary" type="button">清空</button>
       </div>
       <nav id="sidebarTools" class="app-sidebar-tools" aria-label="工具列表"></nav>
+      <button id="leftPanelExpand" class="panel-rail-button" type="button" title="展开左侧栏">›</button>
+      <div id="leftResizeHandle" class="resize-handle resize-handle-left" role="separator" aria-orientation="vertical" title="拖拽调整左侧栏宽度"></div>
     </aside>
 
     <main class="app-main">
@@ -139,12 +142,15 @@
     </main>
 
     <aside class="history-panel">
+      <button id="toggleRightPanel" class="panel-toggle history-panel-toggle" type="button" title="折叠历史栏">›</button>
       <div class="history-head">
         <div>
           <strong>历史记录</strong>
           <span id="historyPath"></span>
         </div>
-        <button id="clearHistory" class="btn danger" type="button">清空</button>
+        <div class="history-actions">
+          <button id="clearHistory" class="btn danger" type="button">清空</button>
+        </div>
       </div>
       <div class="history-scope" role="group" aria-label="历史范围">
         <button id="historyCurrent" class="scope-button active" type="button">当前工具</button>
@@ -152,6 +158,8 @@
       </div>
       <input id="historySearch" class="history-search" type="search" placeholder="搜索历史" autocomplete="off">
       <div id="historyList" class="history-list"></div>
+      <button id="rightPanelExpand" class="panel-rail-button" type="button" title="展开历史栏">‹</button>
+      <div id="rightResizeHandle" class="resize-handle resize-handle-right" role="separator" aria-orientation="vertical" title="拖拽调整历史栏宽度"></div>
     </aside>
   </div>
 
