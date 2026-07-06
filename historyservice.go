@@ -44,6 +44,6 @@ func defaultHistoryPath() string {
 	if err != nil || base == "" {
 		base = "."
 	}
-	// This file is intentionally outside the app bundle so upgrades keep user history.
-	return filepath.Join(base, "Wrench Desktop", "history.jsonl")
+	// This database is intentionally outside the app bundle so upgrades keep user history.
+	return filepath.Join(base, "Wrench Desktop", "wrench.db")
 }

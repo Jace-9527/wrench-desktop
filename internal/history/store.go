@@ -1,15 +1,17 @@
 package history
 
 import (
-	"bufio"
-	"encoding/json"
+	"crypto/rand"
+	"database/sql"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 	"time"
+
+	_ "modernc.org/sqlite"
 )
 
 type Entry struct {
@@ -30,7 +32,7 @@ type CreateRequest struct {
 
 type Store struct {
 	path string
-	mu   sync.Mutex
+	db   *sql.DB
 }
 
 func NewStore(path string) (*Store, error) {
@@ -40,18 +42,48 @@ func NewStore(path string) (*Store, error) {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return nil, err
 	}
-	if _, err := os.Stat(path); errors.Is(err, os.ErrNotExist) {
-		file, createErr := os.OpenFile(path, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
-		if createErr != nil {
-			return nil, createErr
-		}
-		return &Store{path: path}, file.Close()
+
+	db, err := sql.Open("sqlite", path)
+	if err != nil {
+		return nil, err
 	}
-	return &Store{path: path}, nil
+	store := &Store{path: path, db: db}
+	if err := store.init(); err != nil {
+		_ = db.Close()
+		return nil, err
+	}
+	return store, nil
 }
 
 func (s *Store) Path() string {
 	return s.path
+}
+
+func (s *Store) Close() error {
+	return s.db.Close()
+}
+
+func (s *Store) init() error {
+	statements := []string{
+		`PRAGMA busy_timeout = 5000`,
+		`PRAGMA journal_mode = WAL`,
+		`CREATE TABLE IF NOT EXISTS history_entries (
+			id TEXT PRIMARY KEY,
+			tool TEXT NOT NULL,
+			title TEXT NOT NULL,
+			input TEXT NOT NULL,
+			output TEXT NOT NULL,
+			created_at TEXT NOT NULL
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_history_tool_created ON history_entries(tool, created_at DESC)`,
+		`CREATE INDEX IF NOT EXISTS idx_history_created ON history_entries(created_at DESC)`,
+	}
+	for _, statement := range statements {
+		if _, err := s.db.Exec(statement); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (s *Store) Create(req CreateRequest) (Entry, error) {
@@ -75,46 +107,55 @@ func (s *Store) Create(req CreateRequest) (Entry, error) {
 		entry.Title = defaultTitle(entry)
 	}
 
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	file, err := os.OpenFile(s.path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
+	_, err := s.db.Exec(
+		`INSERT INTO history_entries (id, tool, title, input, output, created_at) VALUES (?, ?, ?, ?, ?, ?)`,
+		entry.ID,
+		entry.Tool,
+		entry.Title,
+		entry.Input,
+		entry.Output,
+		formatTime(entry.CreatedAt),
+	)
 	if err != nil {
-		return Entry{}, err
-	}
-	defer file.Close()
-
-	line, err := json.Marshal(entry)
-	if err != nil {
-		return Entry{}, err
-	}
-	if _, err := file.Write(append(line, '\n')); err != nil {
 		return Entry{}, err
 	}
 	return entry, nil
 }
 
 func (s *Store) List(tool string, limit int) ([]Entry, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	tool = strings.TrimSpace(tool)
+	query := `SELECT id, tool, title, input, output, created_at FROM history_entries`
+	args := []any{}
+	if tool != "" {
+		query += ` WHERE tool = ?`
+		args = append(args, tool)
+	}
+	query += ` ORDER BY created_at DESC, id DESC`
+	if limit > 0 {
+		query += ` LIMIT ?`
+		args = append(args, limit)
+	}
 
-	entries, err := s.readAllLocked()
+	rows, err := s.db.Query(query, args...)
 	if err != nil {
 		return nil, err
 	}
+	defer rows.Close()
 
-	tool = strings.TrimSpace(tool)
-	out := make([]Entry, 0, len(entries))
-	for i := len(entries) - 1; i >= 0; i-- {
-		if tool != "" && entries[i].Tool != tool {
-			continue
+	entries := []Entry{}
+	for rows.Next() {
+		var entry Entry
+		var createdAt string
+		if err := rows.Scan(&entry.ID, &entry.Tool, &entry.Title, &entry.Input, &entry.Output, &createdAt); err != nil {
+			return nil, err
 		}
-		out = append(out, entries[i])
-		if limit > 0 && len(out) >= limit {
-			break
+		entry.CreatedAt, err = parseTime(createdAt)
+		if err != nil {
+			return nil, err
 		}
+		entries = append(entries, entry)
 	}
-	return out, nil
+	return entries, rows.Err()
 }
 
 func (s *Store) Delete(id string) error {
@@ -122,104 +163,18 @@ func (s *Store) Delete(id string) error {
 	if id == "" {
 		return errors.New("id is required")
 	}
-
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	entries, err := s.readAllLocked()
-	if err != nil {
-		return err
-	}
-
-	next := entries[:0]
-	deleted := false
-	for _, entry := range entries {
-		if entry.ID == id {
-			deleted = true
-			continue
-		}
-		next = append(next, entry)
-	}
-	if !deleted {
-		return nil
-	}
-	return s.writeAllLocked(next)
+	_, err := s.db.Exec(`DELETE FROM history_entries WHERE id = ?`, id)
+	return err
 }
 
 func (s *Store) Clear(tool string) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
 	tool = strings.TrimSpace(tool)
 	if tool == "" {
-		return os.WriteFile(s.path, nil, 0o600)
-	}
-
-	entries, err := s.readAllLocked()
-	if err != nil {
+		_, err := s.db.Exec(`DELETE FROM history_entries`)
 		return err
 	}
-	next := entries[:0]
-	for _, entry := range entries {
-		if entry.Tool != tool {
-			next = append(next, entry)
-		}
-	}
-	return s.writeAllLocked(next)
-}
-
-func (s *Store) readAllLocked() ([]Entry, error) {
-	file, err := os.OpenFile(s.path, os.O_CREATE|os.O_RDONLY, 0o600)
-	if err != nil {
-		return nil, err
-	}
-	defer file.Close()
-
-	var entries []Entry
-	scanner := bufio.NewScanner(file)
-	scanner.Buffer(make([]byte, 64*1024), 16*1024*1024)
-	lineNo := 0
-	for scanner.Scan() {
-		lineNo++
-		line := strings.TrimSpace(scanner.Text())
-		if line == "" {
-			continue
-		}
-		var entry Entry
-		if err := json.Unmarshal([]byte(line), &entry); err != nil {
-			return nil, fmt.Errorf("decode history line %d: %w", lineNo, err)
-		}
-		entries = append(entries, entry)
-	}
-	return entries, scanner.Err()
-}
-
-func (s *Store) writeAllLocked(entries []Entry) error {
-	tmp := s.path + ".tmp"
-	file, err := os.OpenFile(tmp, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o600)
-	if err != nil {
-		return err
-	}
-	writer := bufio.NewWriter(file)
-	for _, entry := range entries {
-		line, err := json.Marshal(entry)
-		if err != nil {
-			_ = file.Close()
-			return err
-		}
-		if _, err := writer.Write(append(line, '\n')); err != nil {
-			_ = file.Close()
-			return err
-		}
-	}
-	if err := writer.Flush(); err != nil {
-		_ = file.Close()
-		return err
-	}
-	if err := file.Close(); err != nil {
-		return err
-	}
-	return os.Rename(tmp, s.path)
+	_, err := s.db.Exec(`DELETE FROM history_entries WHERE tool = ?`, tool)
+	return err
 }
 
 func defaultTitle(entry Entry) string {
@@ -238,5 +193,21 @@ func defaultTitle(entry Entry) string {
 }
 
 func newID(now time.Time) string {
-	return fmt.Sprintf("%d", now.UnixNano())
+	var suffix [8]byte
+	if _, err := rand.Read(suffix[:]); err != nil {
+		return fmt.Sprintf("%d", now.UnixNano())
+	}
+	return fmt.Sprintf("%d-%s", now.UnixNano(), hex.EncodeToString(suffix[:]))
+}
+
+func formatTime(value time.Time) string {
+	return value.UTC().Format(time.RFC3339Nano)
+}
+
+func parseTime(value string) (time.Time, error) {
+	parsed, err := time.Parse(time.RFC3339Nano, value)
+	if err != nil {
+		return time.Time{}, err
+	}
+	return parsed.UTC(), nil
 }

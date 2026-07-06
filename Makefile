@@ -2,6 +2,7 @@
 
 test:
 	go test ./internal/...
+	node --test frontend/src
 
 frontend-build:
 	rm -rf frontend/dist
