@@ -1,0 +1,35 @@
+version: '3'
+
+vars:
+  APP_NAME: wrench-desktop
+  BIN_DIR: bin
+  GO: /usr/local/go/bin/go
+
+tasks:
+  build:
+    summary: Builds the desktop binary.
+    cmds:
+      - task: generate:bindings
+      - task: build:frontend
+      - mkdir -p {{.BIN_DIR}}
+      - '{{.GO}} build -tags production -trimpath -buildvcs=false -ldflags="-w -s" -o {{.BIN_DIR}}/{{.APP_NAME}} .'
+
+  dev:
+    summary: Builds and runs the app in development mode.
+    cmds:
+      - task: generate:bindings
+      - task: build:frontend
+      - mkdir -p {{.BIN_DIR}}
+      - '{{.GO}} build -buildvcs=false -gcflags=all="-l" -o {{.BIN_DIR}}/{{.APP_NAME}} .'
+      - ./{{.BIN_DIR}}/{{.APP_NAME}}
+
+  build:frontend:
+    summary: Copies the no-bundler frontend into frontend/dist.
+    cmds:
+      - make frontend-build
+
+  generate:bindings:
+    summary: Generates Wails bindings for Go services.
+    cmds:
+      - '{{.GO}} mod tidy'
+      - wails3 generate bindings -clean=true -ts -i

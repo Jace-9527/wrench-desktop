@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Wrench Desktop</title>
+  <link rel="stylesheet" href="./src/style.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark">W</div>
+        <div>
+          <strong>Wrench Desktop</strong>
+          <span>本地历史自动保存</span>
+        </div>
+      </div>
+      <nav class="tool-nav" id="toolNav"></nav>
+    </aside>
+
+    <main class="workspace">
+      <header class="workspace-header">
+        <div>
+          <p id="toolCategory" class="eyebrow"></p>
+          <h1 id="toolName"></h1>
+        </div>
+        <span class="save-state">转换后自动保存</span>
+      </header>
+
+      <section class="editor-grid">
+        <label class="editor-panel">
+          <span>输入</span>
+          <textarea id="inputText" spellcheck="false"></textarea>
+        </label>
+        <label class="editor-panel">
+          <span>输出</span>
+          <textarea id="outputText" spellcheck="false" readonly></textarea>
+        </label>
+      </section>
+
+      <div class="actions">
+        <button id="primaryAction">转换并保存</button>
+        <button id="copyOutput" class="secondary">复制输出</button>
+        <button id="clearInput" class="secondary">清空</button>
+        <span id="statusText" class="status"></span>
+      </div>
+    </main>
+
+    <aside class="history-panel">
+      <div class="history-head">
+        <div>
+          <strong>历史记录</strong>
+          <span id="historyPath"></span>
+        </div>
+        <button id="clearHistory" class="danger">清空</button>
+      </div>
+      <input id="historySearch" class="history-search" type="search" placeholder="搜索历史">
+      <div id="historyList" class="history-list"></div>
+    </aside>
+  </div>
+
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>
