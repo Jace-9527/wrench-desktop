@@ -1,8 +1,10 @@
 .PHONY: test frontend-build wails-dev wails-build clean
 
+GO ?= /usr/local/go/bin/go
+
 test:
-	go test ./internal/...
-	node --test frontend/src
+	$(GO) test ./internal/...
+	node --test frontend/src/*.test.js
 
 frontend-build:
 	rm -rf frontend/dist
