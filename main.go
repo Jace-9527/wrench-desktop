@@ -15,12 +15,14 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	windowService := NewWindowService()
 
 	app := application.New(application.Options{
 		Name:        "Wrench Desktop",
 		Description: "Local toolbox with saved input history.",
 		Services: []application.Service{
 			application.NewService(historyService),
+			application.NewService(windowService),
 		},
 		Assets: application.AssetOptions{
 			Handler: application.AssetFileServerFS(assets),
@@ -29,6 +31,7 @@ func main() {
 			ApplicationShouldTerminateAfterLastWindowClosed: true,
 		},
 	})
+	windowService.setApp(app)
 
 	window := app.Window.NewWithOptions(application.WebviewWindowOptions{
 		Title:            "Wrench Desktop",

@@ -41,6 +41,23 @@ button { cursor: pointer; }
   grid-template-columns: var(--left-panel-width) minmax(0, 1fr) var(--right-panel-width);
 }
 
+body.tool-window-mode .app-shell {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+body.tool-window-mode .app-sidebar,
+body.tool-window-mode .history-panel {
+  display: none;
+}
+
+body.tool-window-mode .container {
+  max-width: none;
+}
+
+body.tool-window-mode .tool-view {
+  padding: 18px;
+}
+
 body.left-panel-collapsed {
   --left-panel-width: 44px;
 }
@@ -728,10 +745,9 @@ textarea:focus {
 .tool-row {
   width: 100%;
   min-height: 126px;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  gap: 16px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
   border: 1px solid var(--border);
   border-radius: 10px;
   background: rgba(18, 27, 46, 0.62);
@@ -744,6 +760,28 @@ textarea:focus {
   border-color: rgba(96, 165, 250, 0.38);
   background: rgba(18, 27, 46, 0.92);
   box-shadow: 0 10px 24px rgba(0, 0, 0, 0.18);
+}
+
+.tool-row-open {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 16px;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  padding: 0;
+  text-align: left;
+}
+
+.tool-row-open:hover {
+  filter: none;
+}
+
+.tool-row-window {
+  align-self: end;
+  white-space: nowrap;
 }
 
 .tool-row-main,
@@ -802,6 +840,14 @@ textarea:focus {
 }
 
 .tool-header { padding: 16px; }
+.tool-header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+body.tool-window-mode #backHome {
+  display: none;
+}
 .tool-header h1 { margin: 6px 0 0; font-size: 24px; }
 .tool-desc { margin: 6px 0 0; color: var(--muted); }
 .eyebrow { margin: 12px 0 0; color: var(--muted); font-size: 12px; }

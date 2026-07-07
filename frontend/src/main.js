@@ -2,6 +2,13 @@ import "./tool-utils.js";
 
 const utils = globalThis.WrenchUtils;
 const $ = (id) => document.getElementById(id);
+const appParams = new URLSearchParams(window.location.search);
+const isToolWindow = appParams.get("mode") === "tool";
+const initialToolID = appParams.get("tool") || "";
+
+if (isToolWindow) {
+  document.body.classList.add("tool-window-mode");
+}
 
 const categoryOrder = ["数据处理", "编码转换", "证书工具"];
 const homeCategoryOrder = ["数据处理", "证书工具", "编码转换"];
@@ -207,7 +214,24 @@ async function loadHistoryService() {
   }
 }
 
+const localWindowService = {
+  async OpenTool(toolID) {
+    const target = `/?mode=tool&tool=${encodeURIComponent(toolID)}`;
+    window.open(target, "_blank", "noopener,noreferrer");
+  }
+};
+
+async function loadWindowService() {
+  try {
+    const bindings = await import("../bindings/wrench-desktop/index.js");
+    return bindings.WindowService || localWindowService;
+  } catch {
+    return localWindowService;
+  }
+}
+
 const historyService = await loadHistoryService();
+const windowService = await loadWindowService();
 const panelState = {
   leftWidth: readNumberSetting("wrench-left-panel-width", 300),
   rightWidth: readNumberSetting("wrench-right-panel-width", 340),
@@ -304,19 +328,22 @@ function renderHomeTools() {
 }
 
 function renderToolRow(tool) {
-  const button = document.createElement("button");
-  button.type = "button";
-  button.className = "tool-row";
-  button.innerHTML = `
-    <span class="tool-row-main">
-      <span class="tool-row-name">${escapeHtml(tool.name)}</span>
-      <span class="tool-row-desc">${escapeHtml(tool.desc)}</span>
-    </span>
-    <span class="tool-row-meta">${escapeHtml(tool.category)}</span>
-    <span class="tool-row-arrow">打开</span>
+  const row = document.createElement("article");
+  row.className = "tool-row";
+  row.innerHTML = `
+    <button class="tool-row-open" type="button">
+      <span class="tool-row-main">
+        <span class="tool-row-name">${escapeHtml(tool.name)}</span>
+        <span class="tool-row-desc">${escapeHtml(tool.desc)}</span>
+      </span>
+      <span class="tool-row-meta">${escapeHtml(tool.category)}</span>
+      <span class="tool-row-arrow">打开</span>
+    </button>
+    <button class="tool-row-window btn secondary" type="button">新窗口</button>
   `;
-  button.addEventListener("click", () => selectTool(tool.id));
-  return button;
+  row.querySelector(".tool-row-open").addEventListener("click", () => selectTool(tool.id));
+  row.querySelector(".tool-row-window").addEventListener("click", () => openToolWindow(tool.id));
+  return row;
 }
 
 function showHome() {
@@ -331,6 +358,7 @@ function selectTool(id) {
   activeTool = toolCatalog.find((tool) => tool.id === id) || toolCatalog[0];
   activeAction = activeTool.actions.find((action) => action.primary)?.id || activeTool.actions[0].id;
   const isJSONTool = activeTool.id === "json";
+  document.title = isToolWindow ? `${activeTool.name} - Wrench` : "Wrench Desktop";
 
   $("homeView").hidden = true;
   $("toolView").hidden = false;
@@ -355,6 +383,19 @@ function selectTool(id) {
   renderOptions();
   renderSidebarTools();
   refreshHistory();
+}
+
+async function openToolWindow(toolID = activeTool.id) {
+  try {
+    await windowService.OpenTool(toolID);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (toolID === "json") {
+      setJSONStatus(`新窗口打开失败：${message}`, true);
+    } else {
+      setStatus(`新窗口打开失败：${message}`, true);
+    }
+  }
 }
 
 function renderActions() {
@@ -1014,6 +1055,7 @@ $("jsonInput").addEventListener("keydown", (event) => {
   }
 });
 $("backHome").addEventListener("click", showHome);
+$("openToolWindow").addEventListener("click", () => openToolWindow(activeTool.id));
 $("toolSearch").addEventListener("input", renderSidebarTools);
 $("toolSearchClear").addEventListener("click", () => {
   $("toolSearch").value = "";
@@ -1050,4 +1092,8 @@ bindPanelResize($("rightResizeHandle"), "right");
 applyPanelState();
 renderSidebarTools();
 renderHomeTools();
-refreshHistory();
+if (isToolWindow) {
+  selectTool(initialToolID || activeTool.id);
+} else {
+  refreshHistory();
+}
