@@ -411,7 +411,14 @@ textarea:focus {
 .history-actions {
   display: inline-flex;
   align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
   gap: 8px;
+}
+
+.history-actions .btn {
+  padding: 8px 10px;
+  font-size: 12px;
 }
 
 .history-head strong,

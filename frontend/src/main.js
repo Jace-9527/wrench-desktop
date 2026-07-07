@@ -670,9 +670,13 @@ function toggleJSONOutputEditor(showEditor) {
 function saveJSONOutput() {
   const text = $("jsonOutput").value;
   if (!text) return;
+  downloadTextFile("wrench-output.json", text, "application/json;charset=utf-8");
+}
+
+function downloadTextFile(filename, text, type) {
   const link = document.createElement("a");
-  link.href = URL.createObjectURL(new Blob([text], { type: "application/json;charset=utf-8" }));
-  link.download = "wrench-output.json";
+  link.href = URL.createObjectURL(new Blob([text], { type }));
+  link.download = filename;
   link.click();
   URL.revokeObjectURL(link.href);
 }
@@ -818,6 +822,41 @@ function renderHistory() {
     more.addEventListener("click", () => refreshHistory({ append: true }));
     list.appendChild(more);
   }
+}
+
+async function exportHistory(format) {
+  const tool = activeHistoryTool();
+  const query = $("historySearch").value.trim();
+  const entries = await historyService.Search(tool, query, 0, 0) || [];
+  if (!entries.length) return;
+
+  const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+  const scope = tool || "all";
+  if (format === "csv") {
+    downloadTextFile(
+      `wrench-history-${scope}-${timestamp}.csv`,
+      historyToCSV(entries),
+      "text/csv;charset=utf-8"
+    );
+    return;
+  }
+
+  downloadTextFile(
+    `wrench-history-${scope}-${timestamp}.json`,
+    JSON.stringify(entries, null, 2),
+    "application/json;charset=utf-8"
+  );
+}
+
+function historyToCSV(entries) {
+  const headers = ["id", "tool", "title", "favorite", "createdAt", "input", "output"];
+  const rows = entries.map((entry) => headers.map((header) => csvCell(entry[header])));
+  return [headers, ...rows].map((row) => row.join(",")).join("\n");
+}
+
+function csvCell(value) {
+  const text = value === null || value === undefined ? "" : String(value);
+  return `"${text.replaceAll('"', '""')}"`;
 }
 
 function loadHistoryEntry(item) {
@@ -994,6 +1033,8 @@ $("historyAll").addEventListener("click", () => {
   refreshHistory();
 });
 $("historySearch").addEventListener("input", () => refreshHistory());
+$("exportHistoryJSON").addEventListener("click", () => exportHistory("json"));
+$("exportHistoryCSV").addEventListener("click", () => exportHistory("csv"));
 $("clearHistory").addEventListener("click", async () => {
   const tool = activeHistoryTool();
   await historyService.Clear(tool);
