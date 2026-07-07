@@ -542,6 +542,20 @@ textarea:focus {
   padding: 6px 8px;
 }
 
+.history-more {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: rgba(18, 27, 46, 0.68);
+  color: var(--text);
+  padding: 10px;
+}
+
+.history-more:hover {
+  border-color: var(--border-strong);
+  background: rgba(23, 37, 63, 0.86);
+}
+
 .home-hero,
 .tool-header,
 .tool-options,

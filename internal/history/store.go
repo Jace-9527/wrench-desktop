@@ -123,20 +123,44 @@ func (s *Store) Create(req CreateRequest) (Entry, error) {
 }
 
 func (s *Store) List(tool string, limit int) ([]Entry, error) {
+	return s.Search(tool, "", limit, 0)
+}
+
+func (s *Store) Search(tool string, search string, limit int, offset int) ([]Entry, error) {
 	tool = strings.TrimSpace(tool)
-	query := `SELECT id, tool, title, input, output, created_at FROM history_entries`
-	args := []any{}
-	if tool != "" {
-		query += ` WHERE tool = ?`
-		args = append(args, tool)
-	}
-	query += ` ORDER BY created_at DESC, id DESC`
-	if limit > 0 {
-		query += ` LIMIT ?`
-		args = append(args, limit)
+	search = strings.TrimSpace(search)
+	if offset < 0 {
+		offset = 0
 	}
 
-	rows, err := s.db.Query(query, args...)
+	sqlQuery := `SELECT id, tool, title, input, output, created_at FROM history_entries`
+	args := []any{}
+	clauses := []string{}
+	if tool != "" {
+		clauses = append(clauses, `tool = ?`)
+		args = append(args, tool)
+	}
+	if search != "" {
+		clauses = append(clauses, `(title LIKE ? ESCAPE '\' OR input LIKE ? ESCAPE '\' OR output LIKE ? ESCAPE '\')`)
+		pattern := "%" + escapeLike(search) + "%"
+		args = append(args, pattern, pattern, pattern)
+	}
+	if len(clauses) > 0 {
+		sqlQuery += ` WHERE ` + strings.Join(clauses, ` AND `)
+	}
+	sqlQuery += ` ORDER BY created_at DESC, id DESC`
+	if limit > 0 {
+		sqlQuery += ` LIMIT ?`
+		args = append(args, limit)
+	} else if offset > 0 {
+		sqlQuery += ` LIMIT -1`
+	}
+	if offset > 0 {
+		sqlQuery += ` OFFSET ?`
+		args = append(args, offset)
+	}
+
+	rows, err := s.db.Query(sqlQuery, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -210,4 +234,17 @@ func parseTime(value string) (time.Time, error) {
 		return time.Time{}, err
 	}
 	return parsed.UTC(), nil
+}
+
+func escapeLike(value string) string {
+	var builder strings.Builder
+	builder.Grow(len(value))
+	for _, char := range value {
+		switch char {
+		case '\\', '%', '_':
+			builder.WriteRune('\\')
+		}
+		builder.WriteRune(char)
+	}
+	return builder.String()
 }

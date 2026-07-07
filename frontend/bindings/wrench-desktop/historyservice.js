@@ -54,6 +54,19 @@ export function List(tool, limit) {
     }));
 }
 
+/**
+ * @param {string} tool
+ * @param {string} query
+ * @param {number} limit
+ * @param {number} offset
+ * @returns {$CancellablePromise<history$0.Entry[]>}
+ */
+export function Search(tool, query, limit, offset) {
+    return $Call.ByID(1691045273, tool, query, limit, offset).then(/** @type {($result: any) => any} */(($result) => {
+        return $$createType1($result);
+    }));
+}
+
 // Private type creation functions
 const $$createType0 = history$0.Entry.createFrom;
 const $$createType1 = $Create.Array($$createType0);

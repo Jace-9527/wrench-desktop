@@ -27,6 +27,10 @@ func (s *HistoryService) List(tool string, limit int) ([]history.Entry, error) {
 	return s.store.List(tool, limit)
 }
 
+func (s *HistoryService) Search(tool string, query string, limit int, offset int) ([]history.Entry, error) {
+	return s.store.Search(tool, query, limit, offset)
+}
+
 func (s *HistoryService) Delete(id string) error {
 	return s.store.Delete(id)
 }

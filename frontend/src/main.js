@@ -141,6 +141,9 @@ let jsonTableRows = [];
 const collapsedSidebarCategories = new Set();
 let historyItems = [];
 let historyScope = "current";
+let historyHasMore = false;
+let historyLoading = false;
+const HISTORY_PAGE_SIZE = 30;
 
 const localHistory = {
   async Create(req) {
@@ -156,8 +159,17 @@ const localHistory = {
     return entry;
   },
   async List(tool, limit) {
+    return this.Search(tool, "", limit || 100, 0);
+  },
+  async Search(tool, query, limit, offset) {
+    const search = String(query || "").trim().toLowerCase();
     const items = JSON.parse(localStorage.getItem("wrench-desktop-history") || "[]");
-    return items.filter((item) => !tool || item.tool === tool).slice().reverse().slice(0, limit || 100);
+    return items
+      .filter((item) => !tool || item.tool === tool)
+      .filter((item) => !search || `${item.title || ""} ${item.input || ""} ${item.output || ""}`.toLowerCase().includes(search))
+      .slice()
+      .reverse()
+      .slice(offset || 0, (offset || 0) + (limit || 100));
   },
   async Delete(id) {
     const items = JSON.parse(localStorage.getItem("wrench-desktop-history") || "[]");
@@ -723,15 +735,28 @@ async function saveHistoryEntry(tool, input, output, action) {
   await refreshHistory();
 }
 
-async function refreshHistory() {
-  const tool = historyScope === "current" && !$("toolView").hidden ? activeTool.id : "";
+function activeHistoryTool() {
+  return historyScope === "current" && !$("toolView").hidden ? activeTool.id : "";
+}
+
+async function refreshHistory({ append = false } = {}) {
+  if (historyLoading) return;
+  historyLoading = true;
+  const tool = activeHistoryTool();
+  const query = $("historySearch").value.trim();
+  const offset = append ? historyItems.length : 0;
   try {
-    historyItems = await historyService.List(tool, 100) || [];
+    const results = await historyService.Search(tool, query, HISTORY_PAGE_SIZE + 1, offset) || [];
+    historyHasMore = results.length > HISTORY_PAGE_SIZE;
+    const page = results.slice(0, HISTORY_PAGE_SIZE);
+    historyItems = append ? historyItems.concat(page) : page;
     $("historyPath").textContent = await historyService.DataPath();
     renderHistoryScope();
     renderHistory();
   } catch (error) {
     $("historyList").innerHTML = `<div class="empty-state">历史读取失败：${escapeHtml(error instanceof Error ? error.message : String(error))}</div>`;
+  } finally {
+    historyLoading = false;
   }
 }
 
@@ -741,17 +766,16 @@ function renderHistoryScope() {
 }
 
 function renderHistory() {
-  const query = $("historySearch").value.trim().toLowerCase();
+  const query = $("historySearch").value.trim();
   const list = $("historyList");
-  const filtered = historyItems.filter((item) => `${item.title || ""} ${item.input || ""} ${item.output || ""}`.toLowerCase().includes(query));
   list.innerHTML = "";
 
-  if (!filtered.length) {
-    list.innerHTML = `<div class="empty-state compact">暂无历史</div>`;
+  if (!historyItems.length) {
+    list.innerHTML = `<div class="empty-state compact">${query ? "没有匹配的历史" : "暂无历史"}</div>`;
     return;
   }
 
-  filtered.forEach((item) => {
+  historyItems.forEach((item) => {
     const row = document.createElement("article");
     row.className = "history-item";
     row.innerHTML = `
@@ -769,6 +793,16 @@ function renderHistory() {
     });
     list.appendChild(row);
   });
+
+  if (historyHasMore) {
+    const more = document.createElement("button");
+    more.className = "history-more";
+    more.type = "button";
+    more.textContent = historyLoading ? "加载中..." : "加载更多";
+    more.disabled = historyLoading;
+    more.addEventListener("click", () => refreshHistory({ append: true }));
+    list.appendChild(more);
+  }
 }
 
 function loadHistoryEntry(item) {
@@ -944,9 +978,9 @@ $("historyAll").addEventListener("click", () => {
   historyScope = "all";
   refreshHistory();
 });
-$("historySearch").addEventListener("input", renderHistory);
+$("historySearch").addEventListener("input", () => refreshHistory());
 $("clearHistory").addEventListener("click", async () => {
-  const tool = historyScope === "current" && !$("toolView").hidden ? activeTool.id : "";
+  const tool = activeHistoryTool();
   await historyService.Clear(tool);
   await refreshHistory();
 });

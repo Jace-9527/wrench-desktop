@@ -131,6 +131,61 @@ func TestStorePersistsEntries(t *testing.T) {
 	}
 }
 
+func TestStoreSearchFiltersAndPaginates(t *testing.T) {
+	store := newTestStore(t)
+
+	entries := []CreateRequest{
+		{Tool: "json", Title: "Customer payload", Input: `{"customer":"alpha"}`, Output: "formatted alpha"},
+		{Tool: "json", Title: "Order payload", Input: `{"order":"bravo"}`, Output: "formatted bravo"},
+		{Tool: "base64", Title: "Encoded payload", Input: "alpha", Output: "YWxwaGE="},
+		{Tool: "url", Title: "Percent payload", Input: "100%25", Output: "100%"},
+	}
+	for _, entry := range entries {
+		if _, err := store.Create(entry); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	jsonMatches, err := store.Search("json", "payload", 10, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(jsonMatches) != 2 {
+		t.Fatalf("expected two json matches: %#v", jsonMatches)
+	}
+
+	inputMatches, err := store.Search("", "alpha", 10, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(inputMatches) != 2 {
+		t.Fatalf("expected search across input/output/title: %#v", inputMatches)
+	}
+
+	firstPage, err := store.Search("", "payload", 2, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	secondPage, err := store.Search("", "payload", 2, 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(firstPage) != 2 || len(secondPage) != 2 {
+		t.Fatalf("unexpected paged results: first=%#v second=%#v", firstPage, secondPage)
+	}
+	if firstPage[0].ID == secondPage[0].ID || firstPage[1].ID == secondPage[1].ID {
+		t.Fatalf("offset returned duplicate rows: first=%#v second=%#v", firstPage, secondPage)
+	}
+
+	percentMatches, err := store.Search("", "%", 10, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(percentMatches) != 1 || percentMatches[0].Tool != "url" {
+		t.Fatalf("percent should be searched literally: %#v", percentMatches)
+	}
+}
+
 func newTestStore(t *testing.T) *Store {
 	t.Helper()
 	store, err := NewStore(filepath.Join(t.TempDir(), "wrench.db"))
