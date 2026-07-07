@@ -1,6 +1,7 @@
 package history
 
 import (
+	"database/sql"
 	"path/filepath"
 	"testing"
 	"time"
@@ -183,6 +184,84 @@ func TestStoreSearchFiltersAndPaginates(t *testing.T) {
 	}
 	if len(percentMatches) != 1 || percentMatches[0].Tool != "url" {
 		t.Fatalf("percent should be searched literally: %#v", percentMatches)
+	}
+}
+
+func TestStoreFavoriteSortsFirst(t *testing.T) {
+	store := newTestStore(t)
+
+	first, err := store.Create(CreateRequest{Tool: "json", Input: "first", Output: "first"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(time.Millisecond)
+	second, err := store.Create(CreateRequest{Tool: "json", Input: "second", Output: "second"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := store.SetFavorite(first.ID, true); err != nil {
+		t.Fatal(err)
+	}
+	entries, err := store.List("json", 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 2 || entries[0].ID != first.ID || !entries[0].Favorite {
+		t.Fatalf("favorite entry should sort first: %#v", entries)
+	}
+
+	if err := store.SetFavorite(first.ID, false); err != nil {
+		t.Fatal(err)
+	}
+	entries, err = store.List("json", 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 2 || entries[0].ID != second.ID || entries[1].Favorite {
+		t.Fatalf("unfavorited entry should return to normal order: %#v", entries)
+	}
+}
+
+func TestStoreMigratesFavoriteColumn(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "wrench.db")
+	db, err := sql.Open("sqlite", path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`CREATE TABLE history_entries (
+		id TEXT PRIMARY KEY,
+		tool TEXT NOT NULL,
+		title TEXT NOT NULL,
+		input TEXT NOT NULL,
+		output TEXT NOT NULL,
+		created_at TEXT NOT NULL
+	)`); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	store, err := NewStore(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+
+	entry, err := store.Create(CreateRequest{Tool: "json", Input: "{}", Output: "{}"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.SetFavorite(entry.ID, true); err != nil {
+		t.Fatal(err)
+	}
+	entries, err := store.List("", 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 1 || !entries[0].Favorite {
+		t.Fatalf("favorite migration did not work: %#v", entries)
 	}
 }
 

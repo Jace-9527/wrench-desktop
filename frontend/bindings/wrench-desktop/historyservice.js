@@ -67,6 +67,15 @@ export function Search(tool, query, limit, offset) {
     }));
 }
 
+/**
+ * @param {string} id
+ * @param {boolean} favorite
+ * @returns {$CancellablePromise<void>}
+ */
+export function SetFavorite(id, favorite) {
+    return $Call.ByID(2329455419, id, favorite);
+}
+
 // Private type creation functions
 const $$createType0 = history$0.Entry.createFrom;
 const $$createType1 = $Create.Array($$createType0);

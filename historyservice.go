@@ -35,6 +35,10 @@ func (s *HistoryService) Delete(id string) error {
 	return s.store.Delete(id)
 }
 
+func (s *HistoryService) SetFavorite(id string, favorite bool) error {
+	return s.store.SetFavorite(id, favorite)
+}
+
 func (s *HistoryService) Clear(tool string) error {
 	return s.store.Clear(tool)
 }

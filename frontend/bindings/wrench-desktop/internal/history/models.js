@@ -103,6 +103,13 @@ export class Entry {
              */
             this["createdAt"] = "0001-01-01T00:00:00.000Z";
         }
+        if (!("favorite" in $$source)) {
+            /**
+             * @member
+             * @type {boolean}
+             */
+            this["favorite"] = false;
+        }
 
         Object.assign(this, $$source);
     }

@@ -151,6 +151,7 @@ const localHistory = {
       id: String(Date.now()),
       createdAt: new Date().toISOString(),
       title: req.title || summarizeText(req.input) || req.tool,
+      favorite: false,
       ...req
     };
     const items = JSON.parse(localStorage.getItem("wrench-desktop-history") || "[]");
@@ -168,12 +169,21 @@ const localHistory = {
       .filter((item) => !tool || item.tool === tool)
       .filter((item) => !search || `${item.title || ""} ${item.input || ""} ${item.output || ""}`.toLowerCase().includes(search))
       .slice()
-      .reverse()
+      .sort((a, b) => {
+        if (Boolean(a.favorite) !== Boolean(b.favorite)) return a.favorite ? -1 : 1;
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      })
       .slice(offset || 0, (offset || 0) + (limit || 100));
   },
   async Delete(id) {
     const items = JSON.parse(localStorage.getItem("wrench-desktop-history") || "[]");
     localStorage.setItem("wrench-desktop-history", JSON.stringify(items.filter((item) => item.id !== id)));
+  },
+  async SetFavorite(id, favorite) {
+    const items = JSON.parse(localStorage.getItem("wrench-desktop-history") || "[]");
+    localStorage.setItem("wrench-desktop-history", JSON.stringify(items.map((item) => (
+      item.id === id ? { ...item, favorite: Boolean(favorite) } : item
+    ))));
   },
   async Clear(tool) {
     if (!tool) {
@@ -779,6 +789,7 @@ function renderHistory() {
     const row = document.createElement("article");
     row.className = "history-item";
     row.innerHTML = `
+      <button class="history-favorite ${item.favorite ? "active" : ""}" type="button" title="${item.favorite ? "取消收藏" : "收藏"}">${item.favorite ? "★" : "☆"}</button>
       <button class="history-load" type="button">
         <strong>${escapeHtml(historyTitle(item))}</strong>
         <span>${escapeHtml(toolNameByID(item.tool))} · ${escapeHtml(formatTime(item.createdAt))}</span>
@@ -786,6 +797,10 @@ function renderHistory() {
       </button>
       <button class="history-delete" type="button">删除</button>
     `;
+    row.querySelector(".history-favorite").addEventListener("click", async () => {
+      await historyService.SetFavorite(item.id, !item.favorite);
+      await refreshHistory();
+    });
     row.querySelector(".history-load").addEventListener("click", () => loadHistoryEntry(item));
     row.querySelector(".history-delete").addEventListener("click", async () => {
       await historyService.Delete(item.id);

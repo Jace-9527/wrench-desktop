@@ -21,6 +21,7 @@ type Entry struct {
 	Input     string    `json:"input"`
 	Output    string    `json:"output"`
 	CreatedAt time.Time `json:"createdAt"`
+	Favorite  bool      `json:"favorite"`
 }
 
 type CreateRequest struct {
@@ -73,13 +74,20 @@ func (s *Store) init() error {
 			title TEXT NOT NULL,
 			input TEXT NOT NULL,
 			output TEXT NOT NULL,
-			created_at TEXT NOT NULL
+			created_at TEXT NOT NULL,
+			favorite INTEGER NOT NULL DEFAULT 0
 		)`,
+		`ALTER TABLE history_entries ADD COLUMN favorite INTEGER NOT NULL DEFAULT 0`,
 		`CREATE INDEX IF NOT EXISTS idx_history_tool_created ON history_entries(tool, created_at DESC)`,
 		`CREATE INDEX IF NOT EXISTS idx_history_created ON history_entries(created_at DESC)`,
+		`CREATE INDEX IF NOT EXISTS idx_history_favorite_created ON history_entries(favorite DESC, created_at DESC)`,
 	}
 	for _, statement := range statements {
 		if _, err := s.db.Exec(statement); err != nil {
+			// Existing local databases from earlier builds need to pass through this lightweight migration path.
+			if strings.Contains(err.Error(), "duplicate column name") {
+				continue
+			}
 			return err
 		}
 	}
@@ -133,7 +141,7 @@ func (s *Store) Search(tool string, search string, limit int, offset int) ([]Ent
 		offset = 0
 	}
 
-	sqlQuery := `SELECT id, tool, title, input, output, created_at FROM history_entries`
+	sqlQuery := `SELECT id, tool, title, input, output, created_at, favorite FROM history_entries`
 	args := []any{}
 	clauses := []string{}
 	if tool != "" {
@@ -148,7 +156,7 @@ func (s *Store) Search(tool string, search string, limit int, offset int) ([]Ent
 	if len(clauses) > 0 {
 		sqlQuery += ` WHERE ` + strings.Join(clauses, ` AND `)
 	}
-	sqlQuery += ` ORDER BY created_at DESC, id DESC`
+	sqlQuery += ` ORDER BY favorite DESC, created_at DESC, id DESC`
 	if limit > 0 {
 		sqlQuery += ` LIMIT ?`
 		args = append(args, limit)
@@ -170,13 +178,15 @@ func (s *Store) Search(tool string, search string, limit int, offset int) ([]Ent
 	for rows.Next() {
 		var entry Entry
 		var createdAt string
-		if err := rows.Scan(&entry.ID, &entry.Tool, &entry.Title, &entry.Input, &entry.Output, &createdAt); err != nil {
+		var favorite int
+		if err := rows.Scan(&entry.ID, &entry.Tool, &entry.Title, &entry.Input, &entry.Output, &createdAt, &favorite); err != nil {
 			return nil, err
 		}
 		entry.CreatedAt, err = parseTime(createdAt)
 		if err != nil {
 			return nil, err
 		}
+		entry.Favorite = favorite != 0
 		entries = append(entries, entry)
 	}
 	return entries, rows.Err()
@@ -188,6 +198,19 @@ func (s *Store) Delete(id string) error {
 		return errors.New("id is required")
 	}
 	_, err := s.db.Exec(`DELETE FROM history_entries WHERE id = ?`, id)
+	return err
+}
+
+func (s *Store) SetFavorite(id string, favorite bool) error {
+	id = strings.TrimSpace(id)
+	if id == "" {
+		return errors.New("id is required")
+	}
+	value := 0
+	if favorite {
+		value = 1
+	}
+	_, err := s.db.Exec(`UPDATE history_entries SET favorite = ? WHERE id = ?`, value, id)
 	return err
 }
 
