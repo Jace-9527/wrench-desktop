@@ -10,7 +10,13 @@
   <div class="app-shell">
     <aside class="app-sidebar">
       <div class="app-sidebar-brand">
-        <div class="app-sidebar-logo">W</div>
+        <div class="app-sidebar-logo" aria-hidden="true">
+          <svg viewBox="0 0 24 24" focusable="false">
+            <path d="M12 3 4.5 7.2v9.6L12 21l7.5-4.2V7.2Z"/>
+            <path d="M12 7.2 8.1 9.4v5.2L12 16.8l3.9-2.2V9.4Z"/>
+            <path d="M12 3v4.2M4.5 7.2l3.6 2.2M19.5 7.2l-3.6 2.2M12 16.8V21"/>
+          </svg>
+        </div>
         <div class="app-sidebar-brand-text">
           <strong>Wrench</strong>
           <span>桌面工具箱</span>
@@ -34,7 +40,7 @@
         </div>
         <button class="workspace-view-button" type="button" aria-label="网格平台">
           <span class="workspace-grid-icon">▦</span>
-          <span>网格平台</span>
+          <span id="workspaceModeLabel">网格平台</span>
         </button>
       </header>
       <div id="homeView" class="container">
@@ -69,6 +75,7 @@
             <div class="tool-header-actions">
               <button id="backHome" class="btn secondary" type="button">全部工具</button>
               <button id="openToolWindow" class="btn secondary" type="button">新窗口</button>
+              <span id="toolWindowBadge" class="tool-window-badge" hidden>独立窗口</span>
             </div>
             <p id="toolCategory" class="eyebrow"></p>
             <h1 id="toolName"></h1>

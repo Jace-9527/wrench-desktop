@@ -37,11 +37,12 @@ func (s *WindowService) OpenTool(toolID string) error {
 		return errors.New("application is not ready")
 	}
 
+	width, minWidth := toolWindowSizes(toolID)
 	window := app.Window.NewWithOptions(application.WebviewWindowOptions{
 		Title:            title + " - Wrench",
-		Width:            1120,
-		Height:           760,
-		MinWidth:         860,
+		Width:            width,
+		Height:           740,
+		MinWidth:         minWidth,
 		MinHeight:        600,
 		BackgroundColour: application.NewRGB(246, 247, 249),
 		URL:              "/?mode=tool&tool=" + url.QueryEscape(toolID),
@@ -50,6 +51,13 @@ func (s *WindowService) OpenTool(toolID string) error {
 	window.Show()
 	window.Focus()
 	return nil
+}
+
+func toolWindowSizes(toolID string) (width int, minWidth int) {
+	if toolID == "json" {
+		return 1120, 900
+	}
+	return 920, 740
 }
 
 var toolWindowTitles = map[string]string{

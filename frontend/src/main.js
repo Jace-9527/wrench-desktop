@@ -401,6 +401,7 @@ function iconMarkup(name, className) {
 function showHome() {
   $("workspaceTitle").textContent = "工作台环境";
   $("workspacePath").textContent = "~/Wrench/Workspace/Dashboard";
+  $("workspaceModeLabel").textContent = "网格平台";
   $("homeView").hidden = false;
   $("toolView").hidden = true;
   renderSidebarTools();
@@ -419,8 +420,10 @@ function selectTool(id) {
   $("toolCategory").textContent = activeTool.category;
   $("toolName").textContent = activeTool.name;
   $("toolDesc").textContent = activeTool.desc;
-  $("workspaceTitle").textContent = activeTool.name;
+  $("workspaceTitle").textContent = isToolWindow ? `${activeTool.name} · 工具窗口` : activeTool.name;
   $("workspacePath").textContent = `~/Wrench/Workspace/${activeTool.id}`;
+  $("workspaceModeLabel").textContent = isToolWindow ? "工具窗口" : "工具台";
+  $("toolWindowBadge").hidden = !isToolWindow;
   $("genericWorkspace").hidden = isJSONTool;
   $("jsonWorkspace").hidden = !isJSONTool;
   if (isJSONTool) {
@@ -444,6 +447,11 @@ function selectTool(id) {
 async function openToolWindow(toolID = activeTool.id) {
   try {
     await windowService.OpenTool(toolID);
+    if (toolID === "json") {
+      setJSONStatus("已打开独立工具窗口", false);
+    } else if (!$("toolView").hidden) {
+      setStatus("已打开独立工具窗口", false);
+    }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     if (toolID === "json") {
@@ -1089,6 +1097,12 @@ $("inputText").addEventListener("keydown", (event) => {
   if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
     event.preventDefault();
     runTool($("primaryAction").dataset.action);
+  }
+});
+document.addEventListener("keydown", (event) => {
+  if (event.key.toLowerCase() === "n" && event.shiftKey && (event.metaKey || event.ctrlKey)) {
+    event.preventDefault();
+    openToolWindow(activeTool.id);
   }
 });
 $("jsonFormat").addEventListener("click", formatJSON);
