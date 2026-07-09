@@ -16,6 +16,8 @@ const toolCatalog = [
   {
     id: "json",
     name: "JSON 解析器",
+    navName: "JSON",
+    icon: "file-json",
     category: "数据处理",
     desc: "提取、格式化、压缩和表格查看 JSON 数据",
     tags: ["json", "format", "minify", "格式化", "压缩", "校验", "解析", "表格"],
@@ -40,6 +42,8 @@ const toolCatalog = [
   {
     id: "base64",
     name: "Base64 编解码",
+    navName: "Base64",
+    icon: "binary",
     category: "编码转换",
     desc: "UTF-8 文本 Base64 编码和解码",
     tags: ["base64", "b64", "编码", "解码"],
@@ -56,6 +60,8 @@ const toolCatalog = [
   {
     id: "url",
     name: "URL 编解码",
+    navName: "URL",
+    icon: "code",
     category: "编码转换",
     desc: "URL 参数和文本片段 percent-encoding 编解码",
     tags: ["url", "uri", "encode", "decode", "编码", "解码"],
@@ -72,6 +78,8 @@ const toolCatalog = [
   {
     id: "pg-array",
     name: "PG Array 转换",
+    navName: "PG",
+    icon: "database",
     category: "数据处理",
     desc: "把一串 ID 转成 PostgreSQL IN 查询数组",
     tags: ["postgres", "pg", "sql", "array", "in", "id", "数组"],
@@ -93,6 +101,8 @@ const toolCatalog = [
   {
     id: "csr",
     name: "CSR 格式化",
+    navName: "CSR",
+    icon: "file-key",
     category: "证书工具",
     desc: "输入 JSON 或原始 CSR，输出规范化 PEM",
     tags: ["csr", "pem", "证书请求", "格式化"],
@@ -118,6 +128,8 @@ const toolCatalog = [
   {
     id: "cert",
     name: "证书格式化",
+    navName: "证书",
+    icon: "certificate",
     category: "证书工具",
     desc: "拆分证书链并查看证书信息",
     tags: ["cert", "certificate", "pem", "证书链", "x509"],
@@ -151,6 +163,24 @@ let historyScope = "current";
 let historyHasMore = false;
 let historyLoading = false;
 const HISTORY_PAGE_SIZE = 30;
+const categoryIcons = {
+  "数据处理": "layers",
+  "编码转换": "binary",
+  "证书工具": "shield"
+};
+
+const iconPaths = {
+  home: '<path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h5v-6h4v6h5V9.5"/>',
+  layers: '<path d="m12 3 8 4.5-8 4.5-8-4.5Z"/><path d="m4 12 8 4.5 8-4.5"/><path d="m4 16.5 8 4.5 8-4.5"/>',
+  shield: '<path d="M12 3 20 6v5.5c0 5-3.2 8.2-8 9.5-4.8-1.3-8-4.5-8-9.5V6Z"/><path d="M12 8v7"/><path d="M9 12h6"/>',
+  "file-json": '<path d="M6 3h8l4 4v14H6Z"/><path d="M14 3v5h5"/><path d="M10 11c-1.2.7-1.2 3.3 0 4"/><path d="M14 11c1.2.7 1.2 3.3 0 4"/><path d="M12 12v.01"/><path d="M12 14v.01"/>',
+  "code-diff": '<path d="M17 7h-6"/><path d="m14 4 3 3-3 3"/><path d="M7 17h6"/><path d="m10 14-3 3 3 3"/>',
+  database: '<ellipse cx="12" cy="5" rx="7" ry="3"/><path d="M5 5v6c0 1.7 3.1 3 7 3s7-1.3 7-3V5"/><path d="M5 11v6c0 1.7 3.1 3 7 3s7-1.3 7-3v-6"/>',
+  binary: '<path d="M7 7h2v6H7Z"/><path d="M15 7h2v6h-2Z"/><path d="M8 17h8"/><path d="M8 21h8"/><path d="M5 17v4"/><path d="M19 17v4"/>',
+  code: '<path d="m9 7-5 5 5 5"/><path d="m15 7 5 5-5 5"/>',
+  "file-key": '<path d="M6 3h8l4 4v14H6Z"/><path d="M14 3v5h5"/><circle cx="11" cy="15" r="2"/><path d="m13 15 3 3"/><path d="m15 18 1-1"/>',
+  certificate: '<path d="M7 3h10l2 2v14l-2 2H7l-2-2V5Z"/><path d="M9 8h6"/><path d="M9 12h6"/><path d="M9 16h3"/><path d="m15.5 16.5 1 1 2-2"/>'
+};
 
 const localHistory = {
   async Create(req) {
@@ -258,7 +288,7 @@ function renderSidebarTools() {
   home.className = "app-sidebar-home";
   home.type = "button";
   home.classList.toggle("active", $("toolView").hidden);
-  home.innerHTML = `<span>首页</span><small>全部工具概览</small>`;
+  home.innerHTML = `${iconMarkup("home", "sidebar-icon")}<span class="sidebar-label"><span>首页 · 全部工具概览</span></span>`;
   home.addEventListener("click", showHome);
   nav.appendChild(home);
 
@@ -274,7 +304,13 @@ function renderSidebarTools() {
     const header = document.createElement("button");
     header.className = "app-sidebar-category";
     header.type = "button";
-    header.innerHTML = `<span>${escapeHtml(category)}</span><span class="app-sidebar-count">${tools.length}</span>`;
+    header.innerHTML = `
+      <span class="sidebar-category-title">
+        ${iconMarkup(categoryIcons[category] || "layers", "sidebar-category-icon")}
+        <span>${escapeHtml(category)}</span>
+      </span>
+      <span class="app-sidebar-count">${tools.length}</span>
+    `;
     header.addEventListener("click", () => {
       if (collapsedSidebarCategories.has(category)) {
         collapsedSidebarCategories.delete(category);
@@ -291,7 +327,13 @@ function renderSidebarTools() {
       button.className = "app-sidebar-tool";
       button.type = "button";
       button.classList.toggle("active", tool.id === activeTool.id && !$("toolView").hidden);
-      button.innerHTML = `<span>${tool.name}</span><small>${tool.desc}</small>`;
+      button.innerHTML = `
+        ${iconMarkup(tool.icon, "sidebar-icon")}
+        <span class="sidebar-label">
+          <span>${escapeHtml(tool.navName || tool.name)}</span>
+          <small>${escapeHtml(tool.desc)}</small>
+        </span>
+      `;
       button.addEventListener("click", () => selectTool(tool.id));
       list.appendChild(button);
     });
@@ -316,7 +358,8 @@ function renderHomeTools() {
     const section = document.createElement("section");
     section.className = "tool-group";
     const heading = document.createElement("h3");
-    heading.textContent = category;
+    const count = filtered.filter((tool) => tool.category === category).length;
+    heading.innerHTML = `<span>${escapeHtml(category)}</span><small>${count} 个</small>`;
     section.appendChild(heading);
 
     const list = document.createElement("div");
@@ -331,22 +374,33 @@ function renderToolRow(tool) {
   const row = document.createElement("article");
   row.className = "tool-row";
   row.innerHTML = `
+    <div class="tool-row-icon">${iconMarkup(tool.icon, "tool-card-icon")}</div>
     <button class="tool-row-open" type="button">
       <span class="tool-row-main">
         <span class="tool-row-name">${escapeHtml(tool.name)}</span>
         <span class="tool-row-desc">${escapeHtml(tool.desc)}</span>
       </span>
-      <span class="tool-row-meta">${escapeHtml(tool.category)}</span>
-      <span class="tool-row-arrow">打开</span>
     </button>
-    <button class="tool-row-window btn secondary" type="button">新窗口</button>
+    <span class="tool-row-meta">${escapeHtml(tool.category)}</span>
+    <div class="tool-row-actions">
+      <button class="tool-row-action primary" type="button">打开</button>
+      <button class="tool-row-window tool-row-action" type="button">+ 新窗口</button>
+    </div>
   `;
   row.querySelector(".tool-row-open").addEventListener("click", () => selectTool(tool.id));
+  row.querySelector(".tool-row-action.primary").addEventListener("click", () => selectTool(tool.id));
   row.querySelector(".tool-row-window").addEventListener("click", () => openToolWindow(tool.id));
   return row;
 }
 
+function iconMarkup(name, className) {
+  const paths = iconPaths[name] || iconPaths.layers;
+  return `<span class="${className}" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false">${paths}</svg></span>`;
+}
+
 function showHome() {
+  $("workspaceTitle").textContent = "工作台环境";
+  $("workspacePath").textContent = "~/Wrench/Workspace/Dashboard";
   $("homeView").hidden = false;
   $("toolView").hidden = true;
   renderSidebarTools();
@@ -365,6 +419,8 @@ function selectTool(id) {
   $("toolCategory").textContent = activeTool.category;
   $("toolName").textContent = activeTool.name;
   $("toolDesc").textContent = activeTool.desc;
+  $("workspaceTitle").textContent = activeTool.name;
+  $("workspacePath").textContent = `~/Wrench/Workspace/${activeTool.id}`;
   $("genericWorkspace").hidden = isJSONTool;
   $("jsonWorkspace").hidden = !isJSONTool;
   if (isJSONTool) {
