@@ -157,6 +157,7 @@ const toolCatalog = [
 let activeTool = toolCatalog[0];
 let activeAction = activeTool.actions[0].id;
 let jsonTableRows = [];
+let jsonLinkedTools = [];
 const collapsedSidebarCategories = new Set();
 let historyItems = [];
 let historyScope = "current";
@@ -544,6 +545,7 @@ function resetJSONWorkspace() {
   $("jsonOutput").classList.remove("json-output-source-hidden");
   setJSONStatus("", false);
   setJSONOutputReady(false);
+  renderJSONLinkedTools([]);
   clearJSONTableView();
 }
 
@@ -586,6 +588,7 @@ async function minifyJSON() {
 function setJSONOutput(text, showEditor) {
   $("jsonOutput").value = text;
   setJSONOutputReady(Boolean(text));
+  updateJSONLinkedTools(text);
   clearJSONTableView();
   if (showEditor && text) {
     renderJSONEditor(text);
@@ -601,6 +604,121 @@ function setJSONOutputReady(ready) {
   ["jsonCopy", "jsonSave", "jsonTableButton"].forEach((id) => {
     $(id).disabled = !ready;
   });
+}
+
+function updateJSONLinkedTools(text) {
+  if (!text.trim()) {
+    renderJSONLinkedTools([]);
+    return;
+  }
+  try {
+    renderJSONLinkedTools(collectJSONLinkedTools(JSON.parse(text)));
+  } catch {
+    renderJSONLinkedTools([]);
+  }
+}
+
+function collectJSONLinkedTools(value) {
+  const links = [];
+  const seen = new Set();
+
+  const visit = (node, path = "$") => {
+    if (typeof node === "string") {
+      const matches = extractPEMBlocks(node);
+      matches.forEach((pem) => {
+        const tool = classifyPEMTool(pem);
+        if (!tool) return;
+        const key = `${tool}:${pem}`;
+        if (seen.has(key)) return;
+        seen.add(key);
+        links.push({ tool, pem, path });
+      });
+      return;
+    }
+    if (Array.isArray(node)) {
+      node.forEach((item, index) => visit(item, `${path}[${index}]`));
+      return;
+    }
+    if (node && typeof node === "object") {
+      Object.entries(node).forEach(([key, child]) => visit(child, `${path}.${key}`));
+    }
+  };
+
+  visit(value);
+  return links;
+}
+
+function extractPEMBlocks(text) {
+  return Array.from(String(text).matchAll(/-----BEGIN [^-]+-----[\s\S]*?-----END [^-]+-----/g)).map(([pem]) => pem);
+}
+
+function classifyPEMTool(pem) {
+  if (/-----BEGIN (NEW )?CERTIFICATE REQUEST-----/.test(pem)) return "csr";
+  if (/-----BEGIN CERTIFICATE-----/.test(pem)) return "cert";
+  return "";
+}
+
+function renderJSONLinkedTools(links) {
+  jsonLinkedTools = links;
+  if (!links.length) {
+    hideJSONContextMenu();
+  }
+}
+
+async function loadLinkedPEMTool(link) {
+  hideJSONContextMenu();
+  selectTool(link.tool);
+  $("inputText").value = link.pem;
+  await runTool("parse");
+}
+
+function getJSONContextMenu() {
+  let menu = $("jsonContextMenu");
+  if (menu) return menu;
+  menu = document.createElement("div");
+  menu.id = "jsonContextMenu";
+  menu.className = "json-context-menu";
+  menu.hidden = true;
+  document.body.appendChild(menu);
+  return menu;
+}
+
+function showJSONContextMenu(event) {
+  if (!jsonLinkedTools.length) return;
+  event.preventDefault();
+  const menu = getJSONContextMenu();
+  menu.replaceChildren();
+
+  const title = document.createElement("div");
+  title.className = "json-context-title";
+  title.textContent = "关联查看";
+  menu.appendChild(title);
+
+  jsonLinkedTools.slice(0, 6).forEach((link, index) => {
+    const item = document.createElement("button");
+    const label = document.createElement("span");
+    const path = document.createElement("small");
+    item.type = "button";
+    item.className = "json-context-item";
+    label.textContent = (link.tool === "csr" ? "查看 CSR" : "查看证书") + (jsonLinkedTools.length > 1 ? " #" + (index + 1) : "");
+    path.textContent = link.path;
+    item.append(label, path);
+    item.addEventListener("click", () => loadLinkedPEMTool(link));
+    menu.appendChild(item);
+  });
+
+  menu.hidden = false;
+  const rect = menu.getBoundingClientRect();
+  const left = Math.min(event.clientX, window.innerWidth - rect.width - 12);
+  const top = Math.min(event.clientY, window.innerHeight - rect.height - 12);
+  menu.style.left = Math.max(12, left) + "px";
+  menu.style.top = Math.max(12, top) + "px";
+}
+
+function hideJSONContextMenu() {
+  const menu = $("jsonContextMenu");
+  if (!menu) return;
+  menu.hidden = true;
 }
 
 function renderJSONEditor(text) {
@@ -1118,6 +1236,15 @@ $("jsonExpand").addEventListener("click", () => toggleJSONOutputEditor(true));
 $("jsonCollapse").addEventListener("click", () => toggleJSONOutputEditor(false));
 $("jsonFullscreenInput").addEventListener("click", () => openFullscreen("输入", $("jsonInput").value));
 $("jsonFullscreenOutput").addEventListener("click", () => openFullscreen("输出", $("jsonOutput").value));
+["jsonOutput", "jsonOutputEditor", "jsonTableContainer"].forEach((id) => {
+  $(id).addEventListener("contextmenu", showJSONContextMenu);
+});
+document.addEventListener("click", hideJSONContextMenu);
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") hideJSONContextMenu();
+});
+window.addEventListener("resize", hideJSONContextMenu);
+window.addEventListener("scroll", hideJSONContextMenu, true);
 $("jsonInput").addEventListener("keydown", (event) => {
   if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
     event.preventDefault();

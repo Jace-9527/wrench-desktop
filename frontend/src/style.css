@@ -1188,6 +1188,60 @@ textarea {
   min-width: 0;
 }
 
+.json-context-menu {
+  position: fixed;
+  z-index: 2000;
+  min-width: 190px;
+  max-width: min(320px, calc(100vw - 24px));
+  padding: 8px;
+  border: 1px solid rgba(4, 217, 255, 0.34);
+  border-radius: 10px;
+  background: rgba(7, 13, 28, 0.98);
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.42), 0 0 24px rgba(4, 217, 255, 0.12);
+}
+
+.json-context-menu[hidden] {
+  display: none;
+}
+
+.json-context-title {
+  padding: 5px 7px 8px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.json-context-item {
+  display: grid;
+  width: 100%;
+  gap: 3px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  padding: 8px 9px;
+  text-align: left;
+  font: inherit;
+}
+
+.json-context-item:hover {
+  background: rgba(4, 217, 255, 0.12);
+  color: var(--brand);
+}
+
+.json-context-item span {
+  font-size: 13px;
+  font-weight: 850;
+}
+
+.json-context-item small {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .json-output-source-hidden,
 .json-editor[hidden],
 .json-table-card[hidden] {
