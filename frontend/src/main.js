@@ -158,6 +158,7 @@ let activeTool = toolCatalog[0];
 let activeAction = activeTool.actions[0].id;
 let jsonTableRows = [];
 let jsonLinkedTools = [];
+const toolDrafts = new Map();
 const collapsedSidebarCategories = new Set();
 let historyItems = [];
 let historyScope = "current";
@@ -264,7 +265,7 @@ async function loadWindowService() {
 const historyService = await loadHistoryService();
 const windowService = await loadWindowService();
 const panelState = {
-  leftWidth: readNumberSetting("wrench-left-panel-width", 300),
+  leftWidth: readNumberSetting("wrench-left-panel-width", 88),
   rightWidth: readNumberSetting("wrench-right-panel-width", 340),
   leftCollapsed: localStorage.getItem("wrench-left-panel-collapsed") === "true",
   rightCollapsed: localStorage.getItem("wrench-right-panel-collapsed") === "true"
@@ -400,9 +401,14 @@ function iconMarkup(name, className) {
 }
 
 function showHome() {
+  saveActiveToolDraft();
   $("workspaceTitle").textContent = "工作台环境";
   $("workspacePath").textContent = "~/Wrench/Workspace/Dashboard";
-  $("workspaceModeLabel").textContent = "网格平台";
+  $("workspaceCategory").hidden = true;
+  $("workspaceDesc").hidden = true;
+  $("backHome").hidden = true;
+  $("openToolWindow").hidden = true;
+  $("toolWindowBadge").hidden = true;
   $("homeView").hidden = false;
   $("toolView").hidden = true;
   renderSidebarTools();
@@ -411,38 +417,134 @@ function showHome() {
 }
 
 function selectTool(id) {
+  saveActiveToolDraft();
   activeTool = toolCatalog.find((tool) => tool.id === id) || toolCatalog[0];
   activeAction = activeTool.actions.find((action) => action.primary)?.id || activeTool.actions[0].id;
   const isJSONTool = activeTool.id === "json";
+  const draft = toolDrafts.get(activeTool.id);
   document.title = isToolWindow ? `${activeTool.name} - Wrench` : "Wrench Desktop";
 
   $("homeView").hidden = true;
   $("toolView").hidden = false;
-  $("toolCategory").textContent = activeTool.category;
-  $("toolName").textContent = activeTool.name;
-  $("toolDesc").textContent = activeTool.desc;
   $("workspaceTitle").textContent = isToolWindow ? `${activeTool.name} · 工具窗口` : activeTool.name;
   $("workspacePath").textContent = `~/Wrench/Workspace/${activeTool.id}`;
-  $("workspaceModeLabel").textContent = isToolWindow ? "工具窗口" : "工具台";
+  $("workspaceCategory").textContent = activeTool.category;
+  $("workspaceCategory").hidden = false;
+  $("workspaceDesc").textContent = activeTool.desc;
+  $("workspaceDesc").hidden = false;
+  $("backHome").hidden = isToolWindow;
+  $("openToolWindow").hidden = isToolWindow;
   $("toolWindowBadge").hidden = !isToolWindow;
   $("genericWorkspace").hidden = isJSONTool;
   $("jsonWorkspace").hidden = !isJSONTool;
   if (isJSONTool) {
-    resetJSONWorkspace();
+    restoreJSONDraft(draft);
     renderSidebarTools();
     refreshHistory();
     return;
   }
 
   $("inputText").placeholder = activeTool.placeholder;
-  $("inputText").value = "";
-  $("outputText").value = "";
-  setStatus("", false);
-  renderDetails();
   renderActions();
   renderOptions();
+  restoreGenericDraft(draft);
   renderSidebarTools();
   refreshHistory();
+}
+
+function saveActiveToolDraft() {
+  if ($("toolView").hidden) return;
+  if (activeTool.id === "json") {
+    toolDrafts.set(activeTool.id, {
+      kind: "json",
+      input: $("jsonInput").value,
+      output: $("jsonOutput").value,
+      showEditor: !$("jsonOutputEditor").hidden,
+      status: $("jsonStatus").textContent,
+      statusError: $("jsonStatus").classList.contains("error"),
+      tableVisible: !$("jsonTableCard").hidden,
+      tableFields: Array.from(document.querySelectorAll("#jsonFieldList input:checked")).map((input) => input.value)
+    });
+    return;
+  }
+
+  toolDrafts.set(activeTool.id, {
+    kind: "generic",
+    input: $("inputText").value,
+    output: $("outputText").value,
+    status: $("statusText").textContent,
+    statusError: $("statusText").classList.contains("error"),
+    details: readCurrentDetails(),
+    options: readCurrentOptions(activeTool)
+  });
+}
+
+function restoreGenericDraft(draft) {
+  if (!draft || draft.kind !== "generic") {
+    $("inputText").value = "";
+    $("outputText").value = "";
+    setStatus("", false);
+    renderDetails();
+    return;
+  }
+  restoreCurrentOptions(draft.options);
+  $("inputText").value = draft.input || "";
+  $("outputText").value = draft.output || "";
+  renderDetails(draft.details || []);
+  setStatus(draft.status || "", draft.statusError);
+}
+
+function restoreJSONDraft(draft) {
+  if (!draft || draft.kind !== "json") {
+    resetJSONWorkspace();
+    return;
+  }
+  $("jsonInput").value = draft.input || "";
+  setJSONOutput(draft.output || "", Boolean(draft.output && draft.showEditor));
+  if (draft.tableVisible && draft.output) {
+    showJSONTableView();
+    restoreJSONTableFields(draft.tableFields || []);
+  } else {
+    clearJSONTableView();
+  }
+  setJSONStatus(draft.status || "", draft.statusError);
+}
+
+function readCurrentDetails() {
+  return Array.from(document.querySelectorAll("#resultDetails .detail-row")).map((row) => [
+    row.querySelector("span")?.textContent || "",
+    row.querySelector("strong")?.textContent || ""
+  ]);
+}
+
+function readCurrentOptions(tool) {
+  const values = {};
+  (tool.options || []).forEach((option) => {
+    const element = $(option.id);
+    if (!element) return;
+    values[option.id] = option.type === "checkbox" ? element.checked : element.value;
+  });
+  return values;
+}
+
+function restoreCurrentOptions(values = {}) {
+  Object.entries(values).forEach(([id, value]) => {
+    const element = $(id);
+    if (!element) return;
+    if (element.type === "checkbox") {
+      element.checked = Boolean(value);
+    } else {
+      element.value = value;
+    }
+  });
+}
+
+function restoreJSONTableFields(fields) {
+  if (!fields.length) return;
+  document.querySelectorAll("#jsonFieldList input").forEach((input) => {
+    input.checked = fields.includes(input.value);
+  });
+  renderJSONTable();
 }
 
 async function openToolWindow(toolID = activeTool.id) {
@@ -1089,12 +1191,14 @@ function loadHistoryEntry(item) {
     $("jsonInput").value = item.input || "";
     setJSONOutput(item.output || "", Boolean(item.output));
     setJSONStatus("已载入历史", false);
+    saveActiveToolDraft();
     return;
   }
   $("inputText").value = item.input || "";
   $("outputText").value = item.output || "";
   renderDetails();
   setStatus("已载入历史", false);
+  saveActiveToolDraft();
 }
 
 function historyTitle(item) {
@@ -1128,7 +1232,7 @@ function clamp(value, min, max) {
 }
 
 function applyPanelState() {
-  const leftWidth = clamp(panelState.leftWidth, 220, 460);
+  const leftWidth = clamp(panelState.leftWidth, 72, 88);
   const rightWidth = clamp(panelState.rightWidth, 260, 560);
   panelState.leftWidth = leftWidth;
   panelState.rightWidth = rightWidth;
@@ -1166,7 +1270,7 @@ function bindPanelResize(handle, side) {
 
     const onMove = (moveEvent) => {
       if (side === "left") {
-        panelState.leftWidth = clamp(moveEvent.clientX, 220, 460);
+        panelState.leftWidth = clamp(moveEvent.clientX, 72, 88);
       } else {
         panelState.rightWidth = clamp(window.innerWidth - moveEvent.clientX, 260, 560);
       }
@@ -1208,6 +1312,7 @@ $("clearInput").addEventListener("click", () => {
   $("outputText").value = "";
   renderDetails();
   setStatus("", false);
+  toolDrafts.delete(activeTool.id);
 });
 $("fullscreenInput").addEventListener("click", () => openFullscreen("输入", $("inputText").value));
 $("fullscreenOutput").addEventListener("click", () => openFullscreen("输出", $("outputText").value));
@@ -1225,7 +1330,10 @@ document.addEventListener("keydown", (event) => {
 });
 $("jsonFormat").addEventListener("click", formatJSON);
 $("jsonMinify").addEventListener("click", minifyJSON);
-$("jsonClear").addEventListener("click", resetJSONWorkspace);
+$("jsonClear").addEventListener("click", () => {
+  resetJSONWorkspace();
+  toolDrafts.delete("json");
+});
 $("jsonCopy").addEventListener("click", async () => {
   await navigator.clipboard.writeText($("jsonOutput").value);
   setJSONStatus("已复制", false);

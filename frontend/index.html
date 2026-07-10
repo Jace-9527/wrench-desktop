@@ -34,21 +34,34 @@
 
     <main class="app-main">
       <header class="workspace-bar">
-        <div>
-          <strong id="workspaceTitle">工作台环境</strong>
+        <div class="workspace-meta">
+          <div class="workspace-title-row">
+            <strong id="workspaceTitle">工作台环境</strong>
+            <span id="workspaceCategory" class="workspace-category" hidden></span>
+          </div>
           <span id="workspacePath">~/Wrench/Workspace/Dashboard</span>
+          <span id="workspaceDesc" class="workspace-desc" hidden></span>
         </div>
-        <button class="workspace-view-button" type="button" aria-label="网格平台">
-          <span class="workspace-grid-icon">▦</span>
-          <span id="workspaceModeLabel">网格平台</span>
-        </button>
+        <div class="workspace-actions">
+          <button id="backHome" class="btn secondary workspace-tool-action" type="button" hidden>全部工具</button>
+          <button id="openToolWindow" class="btn secondary workspace-tool-action" type="button" hidden>新窗口</button>
+          <span id="toolWindowBadge" class="tool-window-badge" hidden>独立窗口</span>
+          <button id="toggleRightPanel" class="panel-toggle workspace-history-toggle" type="button" title="折叠历史栏">›</button>
+        </div>
       </header>
       <div id="homeView" class="container">
         <div class="home-hero">
           <div class="home-privacy-brand">
+            <div class="home-hero-logo" aria-hidden="true">
+              <svg viewBox="0 0 24 24" focusable="false">
+                <path d="M12 3 4.5 7.2v9.6L12 21l7.5-4.2V7.2Z"/>
+                <path d="M12 7.2 8.1 9.4v5.2L12 16.8l3.9-2.2V9.4Z"/>
+                <path d="M12 3v4.2M4.5 7.2l3.6 2.2M19.5 7.2l-3.6 2.2M12 16.8V21"/>
+              </svg>
+            </div>
             <div>
-              <div class="home-privacy-title">Wrench</div>
-              <div class="home-privacy-subtitle">桌面工具箱</div>
+              <div class="home-privacy-title">Wrench 桌面工具箱 <span>LOCAL DEVBOX</span></div>
+              <div class="home-privacy-subtitle">所有工具皆在本机进行处理，适合日常数据、编码和证书工作流。</div>
             </div>
           </div>
           <div class="home-hero-search">
@@ -70,19 +83,6 @@
       </div>
 
       <div id="toolView" class="container tool-view" hidden>
-        <header class="tool-header">
-          <div>
-            <div class="tool-header-actions">
-              <button id="backHome" class="btn secondary" type="button">全部工具</button>
-              <button id="openToolWindow" class="btn secondary" type="button">新窗口</button>
-              <span id="toolWindowBadge" class="tool-window-badge" hidden>独立窗口</span>
-            </div>
-            <p id="toolCategory" class="eyebrow"></p>
-            <h1 id="toolName"></h1>
-            <p id="toolDesc" class="tool-desc"></p>
-          </div>
-        </header>
-
         <div id="genericWorkspace">
           <section class="generic-grid">
             <div class="card half">
@@ -162,7 +162,6 @@
     </main>
 
     <aside class="history-panel">
-      <button id="toggleRightPanel" class="panel-toggle history-panel-toggle" type="button" title="折叠历史栏">›</button>
       <div class="history-head">
         <div>
           <strong>历史记录</strong>
